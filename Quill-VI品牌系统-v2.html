@@ -1,0 +1,1502 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quill · 翎 — Visual Identity System v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&family=Noto+Serif+SC:wght@200;300;400;500;600;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* CINNABAR SCROLL palette - merged from upload */
+    --ink:        #1a1410;        /* warmer black - aged ink */
+    --ink-deep:   #0a0806;
+    --paper:      #f1e9d6;        /* aged scroll paper */
+    --paper-2:    #ebe1c9;        /* deeper paper */
+    --paper-3:    #e1d6b8;
+    --cinnabar:   #b23a2b;        /* the seal red - WARMER than my original 8B0000 */
+    --cinnabar-2: #962f24;
+    --tea:        #c9a96e;        /* tea/gold accent */
+    --celadon:    #7a8a6c;        /* celadon green - rare detail */
+    --mist:       #d9d1bc;
+    --muted:      #6b5d49;
+
+    --serif:      'Cormorant Garamond', Georgia, serif;
+    --serif-cn:   'Noto Serif SC', serif;
+    --sans:       'DM Sans', -apple-system, sans-serif;
+    --mono:       'JetBrains Mono', monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.55;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--cinnabar); color: var(--paper); }
+
+  /* Scroll paper texture */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      radial-gradient(circle at 10% 20%, rgba(140,110,70,.08) 0 2px, transparent 3px) 0 0/7px 7px,
+      radial-gradient(circle at 60% 70%, rgba(140,110,70,.06) 0 1.5px, transparent 2.5px) 0 0/11px 11px,
+      radial-gradient(circle at 80% 30%, rgba(70,50,30,.05) 0 1.5px, transparent 2.5px) 0 0/13px 13px;
+    pointer-events: none;
+    z-index: 1;
+    mix-blend-mode: multiply;
+    opacity: 0.9;
+  }
+
+  .wrap {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 64px;
+    position: relative;
+    z-index: 2;
+  }
+  @media (max-width: 768px) { .wrap { padding: 0 24px; } }
+
+  section { padding: 160px 0; position: relative; }
+
+  /* ════════════════════════════════════════════════════
+     DOCUMENT HEAD (dark intro bar)
+     ════════════════════════════════════════════════════ */
+  .doc-head {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 80px 0 60px;
+    border-bottom: 1px solid rgba(241,233,214,.1);
+  }
+  .doc-head .wrap {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 40px;
+    flex-wrap: wrap;
+  }
+  .doc-head h1 {
+    font-family: var(--serif);
+    font-size: clamp(48px, 7vw, 88px);
+    font-weight: 500;
+    letter-spacing: -.02em;
+    line-height: 1;
+  }
+  .doc-head h1 em {
+    font-style: italic;
+    color: var(--tea);
+  }
+  .doc-head .meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .15em;
+    opacity: .55;
+    text-align: right;
+    line-height: 1.9;
+    text-transform: uppercase;
+  }
+  .doc-head .meta span { color: var(--cinnabar); }
+
+  .toc {
+    display: flex;
+    gap: 0;
+    border-top: 1px solid rgba(241,233,214,.15);
+    margin-top: 56px;
+    flex-wrap: wrap;
+  }
+  .toc a {
+    flex: 1;
+    min-width: 130px;
+    padding: 24px 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--paper);
+    opacity: .65;
+    border-right: 1px solid rgba(241,233,214,.15);
+    text-decoration: none;
+    transition: all .3s ease;
+  }
+  .toc a:last-child { border-right: none; }
+  .toc a:hover {
+    opacity: 1;
+    color: var(--tea);
+  }
+  .toc a span {
+    display: block;
+    opacity: .5;
+    margin-bottom: 6px;
+    font-size: 10px;
+  }
+
+  /* ════════════════════════════════════════════════════
+     OPENER (Cinnabar seal grand entrance)
+     ════════════════════════════════════════════════════ */
+  .opener {
+    padding: 160px 0 140px;
+    position: relative;
+    overflow: hidden;
+  }
+  .opener .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    align-items: center;
+  }
+  @media (max-width: 968px) { .opener .grid { grid-template-columns: 1fr; gap: 60px; } }
+  .opener .index {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    opacity: .55;
+    color: var(--muted);
+  }
+  .opener .titles {
+    display: flex;
+    align-items: baseline;
+    gap: 28px;
+    margin-top: 28px;
+    flex-wrap: wrap;
+  }
+  .opener .cn-title {
+    font-family: var(--serif-cn);
+    font-size: clamp(72px, 10vw, 132px);
+    font-weight: 500;
+    letter-spacing: .08em;
+    color: var(--cinnabar);
+    line-height: 1;
+  }
+  .opener .en-title {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: clamp(40px, 5vw, 60px);
+    font-weight: 400;
+    color: var(--ink);
+    letter-spacing: -.01em;
+  }
+  .opener .tag {
+    margin-top: 40px;
+    font-family: var(--serif);
+    font-size: clamp(24px, 2.6vw, 36px);
+    font-style: italic;
+    line-height: 1.35;
+    max-width: 520px;
+    color: var(--ink);
+    letter-spacing: -.01em;
+  }
+  .opener .tag-cn {
+    margin-top: 24px;
+    font-family: var(--serif-cn);
+    font-size: 20px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    line-height: 1.6;
+  }
+  .opener .seal-display {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  /* ════════════════════════════════════════════════════
+     CHAPTERS - generic structure
+     ════════════════════════════════════════════════════ */
+  .ch-num {
+    font-family: var(--serif);
+    font-style: italic;
+    font-weight: 300;
+    font-size: 320px;
+    color: var(--paper-2);
+    line-height: 1;
+    position: absolute;
+    top: 80px;
+    right: 64px;
+    user-select: none;
+    z-index: 0;
+    letter-spacing: -.05em;
+  }
+  @media (max-width: 768px) { .ch-num { font-size: 160px; right: 24px; top: 60px; } }
+
+  .ch-eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--cinnabar);
+    letter-spacing: .25em;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+    position: relative;
+    z-index: 2;
+  }
+  .ch-eyebrow::before {
+    content: '';
+    display: inline-block;
+    width: 32px;
+    height: 1px;
+    background: var(--cinnabar);
+    margin-right: 16px;
+    vertical-align: middle;
+  }
+  .ch-title {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: clamp(56px, 7vw, 112px);
+    line-height: 0.95;
+    letter-spacing: -.025em;
+    color: var(--ink);
+    position: relative;
+    z-index: 2;
+    max-width: 900px;
+  }
+  .ch-title em {
+    font-style: italic;
+    color: var(--cinnabar);
+  }
+  .ch-sub {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 22px;
+    color: var(--muted);
+    margin-top: 32px;
+    max-width: 760px;
+    line-height: 1.5;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* ════════════════════════════════════════════════════
+     CH 01 · STORY (philosophy)
+     ════════════════════════════════════════════════════ */
+  .story-grid {
+    margin-top: 120px;
+    display: grid;
+    grid-template-columns: 1fr 1.4fr;
+    gap: 100px;
+    align-items: start;
+  }
+  @media (max-width: 968px) { .story-grid { grid-template-columns: 1fr; gap: 48px; } }
+
+  .story-h {
+    font-family: var(--serif);
+    font-size: 56px;
+    font-weight: 500;
+    line-height: 1.05;
+    letter-spacing: -.02em;
+    color: var(--ink);
+    max-width: 380px;
+  }
+  .story-h em {
+    font-style: italic;
+    color: var(--cinnabar);
+  }
+  .story-body {
+    font-family: var(--sans);
+    font-size: 18px;
+    line-height: 1.75;
+    color: var(--ink);
+    max-width: 540px;
+  }
+  .story-body p + p { margin-top: 1.1em; }
+  .story-body strong { color: var(--cinnabar); font-weight: 600; }
+  .story-pull {
+    font-family: var(--serif-cn);
+    font-size: 19px;
+    line-height: 2;
+    margin-top: 40px;
+    padding-left: 24px;
+    border-left: 2px solid var(--cinnabar);
+    color: var(--muted);
+    font-weight: 300;
+  }
+  .story-pull strong { color: var(--cinnabar); font-weight: 500; }
+
+  /* Four pillars */
+  .pillars {
+    margin-top: 120px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: rgba(26,20,16,.12);
+    border: 1px solid rgba(26,20,16,.12);
+  }
+  @media (max-width: 768px) { .pillars { grid-template-columns: 1fr; } }
+  .pillar {
+    background: var(--paper);
+    padding: 56px 48px;
+  }
+  .pillar-id {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .22em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+  .pillar h3 {
+    font-family: var(--serif-cn);
+    font-weight: 400;
+    font-size: 48px;
+    color: var(--cinnabar);
+    margin-bottom: 20px;
+    letter-spacing: .08em;
+    line-height: 1;
+  }
+  .pillar h3 em {
+    font-family: var(--serif);
+    font-style: italic;
+    font-weight: 400;
+    margin-left: 16px;
+    font-size: 32px;
+    letter-spacing: -.01em;
+  }
+  .pillar p {
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.7;
+    color: var(--ink);
+    max-width: 420px;
+  }
+  .pillar p + p {
+    margin-top: 16px;
+    font-family: var(--serif-cn);
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.8;
+  }
+
+  /* ════════════════════════════════════════════════════
+     CH 02 · LOGO SYSTEM
+     ════════════════════════════════════════════════════ */
+  .logo-section { background: var(--paper-2); }
+
+  .logo-primary {
+    margin-top: 80px;
+    background: var(--paper);
+    padding: 100px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 480px;
+    border-radius: 4px;
+  }
+  /* Corner crop marks */
+  .logo-primary::before,
+  .logo-primary::after {
+    content: "";
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border: 1px solid rgba(26,20,16,.25);
+  }
+  .logo-primary::before {
+    top: 20px; left: 20px;
+    border-right: none;
+    border-bottom: none;
+  }
+  .logo-primary::after {
+    bottom: 20px; right: 20px;
+    border-left: none;
+    border-top: none;
+  }
+  .logo-primary-meta {
+    position: absolute;
+    bottom: 24px;
+    left: 24px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .logo-primary-meta span { color: var(--cinnabar); }
+  .logo-primary-info {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: right;
+    line-height: 1.8;
+  }
+
+  .logo-variants {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-top: 16px;
+  }
+  @media (max-width: 968px) { .logo-variants { grid-template-columns: 1fr 1fr; } }
+  .logo-var {
+    background: var(--paper);
+    padding: 48px 32px;
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    border-radius: 4px;
+    position: relative;
+  }
+  .logo-var.dark {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .logo-var.cinnabar {
+    background: var(--cinnabar);
+    color: var(--paper);
+  }
+  .logo-var.tea {
+    background: var(--paper-3);
+  }
+  .logo-var .name {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    opacity: .65;
+    margin-top: auto;
+    text-align: center;
+  }
+
+  /* Construction explanation block */
+  .logo-construction {
+    margin-top: 60px;
+    padding: 48px;
+    background: var(--paper);
+    border-left: 3px solid var(--cinnabar);
+    border-radius: 0 4px 4px 0;
+  }
+  .logo-construction h4 {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .25em;
+    color: var(--cinnabar);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .logo-construction p {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 22px;
+    line-height: 1.6;
+    color: var(--ink);
+    letter-spacing: -.005em;
+  }
+  .logo-construction p strong { color: var(--cinnabar); font-style: normal; font-weight: 500; }
+
+  /* ════════════════════════════════════════════════════
+     CH 03 · COLOR SYSTEM
+     ════════════════════════════════════════════════════ */
+  .swatches {
+    margin-top: 80px;
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+    gap: 8px;
+  }
+  @media (max-width: 768px) { .swatches { grid-template-columns: 1fr 1fr; } }
+  .sw {
+    aspect-ratio: 3/4;
+    padding: 28px 24px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .1em;
+    border-radius: 4px;
+    transition: transform .4s ease;
+  }
+  .sw:hover { transform: translateY(-4px); }
+  .sw.cinnabar { background: var(--cinnabar); color: var(--paper); }
+  .sw.ink { background: var(--ink); color: var(--paper); }
+  .sw.paper { background: var(--paper); color: var(--ink); border: 1px solid var(--mist); }
+  .sw.tea { background: var(--tea); color: var(--ink); }
+  .sw.celadon { background: var(--celadon); color: var(--paper); }
+  .sw .name {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 32px;
+    letter-spacing: 0;
+    font-weight: 500;
+  }
+  .sw .cn {
+    font-family: var(--serif-cn);
+    font-size: 14px;
+    letter-spacing: .12em;
+    margin-top: 6px;
+    font-weight: 400;
+  }
+  .sw .hex { font-weight: 500; }
+  .sw .role {
+    font-size: 9px;
+    opacity: .7;
+    letter-spacing: .18em;
+    margin-top: 4px;
+  }
+
+  .ratio-bar {
+    margin-top: 80px;
+    background: var(--paper);
+    padding: 48px;
+    border-radius: 4px;
+  }
+  .ratio-bar-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .25em;
+    color: var(--cinnabar);
+    text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+  .ratio-bar-strip {
+    display: flex;
+    height: 64px;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .ratio-bar-strip > div {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .15em;
+  }
+  .ratio-note {
+    margin-top: 28px;
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 19px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* ════════════════════════════════════════════════════
+     CH 04 · TYPOGRAPHY
+     ════════════════════════════════════════════════════ */
+  .type-section { background: var(--paper-2); }
+
+  .type-row {
+    padding: 80px 0;
+    border-top: 1px solid rgba(26,20,16,.12);
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 80px;
+    align-items: start;
+  }
+  .type-row:first-of-type { margin-top: 80px; }
+  @media (max-width: 968px) { .type-row { grid-template-columns: 1fr; gap: 32px; } }
+
+  .type-meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .15em;
+    color: var(--muted);
+    line-height: 2;
+    text-transform: uppercase;
+  }
+  .type-meta .name {
+    display: block;
+    font-family: var(--serif);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 32px;
+    color: var(--ink);
+    margin-bottom: 20px;
+    text-transform: none;
+    line-height: 1;
+    letter-spacing: -.01em;
+  }
+  .type-meta .role {
+    color: var(--cinnabar);
+    margin-bottom: 16px;
+    display: block;
+  }
+
+  .type-display {
+    font-family: var(--serif);
+    font-size: clamp(64px, 8vw, 132px);
+    font-weight: 500;
+    line-height: 0.95;
+    letter-spacing: -.025em;
+    color: var(--ink);
+  }
+  .type-display em {
+    font-style: italic;
+    color: var(--cinnabar);
+  }
+  .type-display-cn {
+    font-family: var(--serif-cn);
+    font-size: clamp(48px, 6vw, 92px);
+    font-weight: 400;
+    line-height: 1.15;
+    letter-spacing: .04em;
+    color: var(--ink);
+  }
+  .type-display-cn em {
+    color: var(--cinnabar);
+    font-weight: 500;
+    font-style: normal;
+  }
+  .type-body-sample {
+    font-family: var(--sans);
+    font-size: 22px;
+    line-height: 1.55;
+    color: var(--ink);
+    max-width: 720px;
+    font-weight: 400;
+  }
+  .type-mono-sample {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.9;
+    letter-spacing: .04em;
+  }
+  .type-note {
+    margin-top: 32px;
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 17px;
+    color: var(--muted);
+    max-width: 600px;
+    line-height: 1.55;
+  }
+
+  /* ════════════════════════════════════════════════════
+     CH 05 · APPLICATIONS
+     ════════════════════════════════════════════════════ */
+  .apps-section { background: var(--ink); color: var(--paper); }
+  .apps-section .ch-title { color: var(--paper); }
+  .apps-section .ch-title em { color: var(--tea); }
+  .apps-section .ch-sub { color: rgba(241,233,214,.55); }
+  .apps-section .ch-eyebrow { color: var(--tea); }
+  .apps-section .ch-eyebrow::before { background: var(--tea); }
+  .apps-section .ch-num { color: rgba(241,233,214,.04); }
+
+  .apps {
+    margin-top: 80px;
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr;
+    gap: 24px;
+  }
+  @media (max-width: 968px) { .apps { grid-template-columns: 1fr; } }
+  .app-card {
+    background: var(--paper);
+    color: var(--ink);
+    aspect-ratio: 4/3;
+    padding: 36px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+    border-radius: 4px;
+  }
+  .app-card .corner {
+    position: absolute;
+    top: 18px; right: 18px;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .2em;
+    opacity: .5;
+    text-transform: uppercase;
+  }
+  .app-card .bot {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+  }
+  .app-card .person .name {
+    font-family: var(--serif);
+    font-size: 28px;
+    font-style: italic;
+    font-weight: 500;
+  }
+  .app-card .person .role {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    margin-top: 4px;
+    opacity: .65;
+  }
+  .app-card.dark {
+    background: var(--ink-deep);
+    color: var(--paper);
+  }
+  .app-card .grid-bg {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(241,233,214,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(241,233,214,0.03) 1px, transparent 1px);
+    background-size: 24px 24px;
+    pointer-events: none;
+  }
+
+  .app-row-2 {
+    margin-top: 24px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  @media (max-width: 768px) { .app-row-2 { grid-template-columns: 1fr; } }
+
+  /* ════════════════════════════════════════════════════
+     CH 06 · BRAND STORY (full narrative)
+     ════════════════════════════════════════════════════ */
+  .narrative {
+    margin-top: 100px;
+    max-width: 800px;
+  }
+  .narrative .lead {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: clamp(28px, 3.5vw, 44px);
+    color: var(--cinnabar);
+    line-height: 1.3;
+    margin-bottom: 56px;
+    letter-spacing: -.015em;
+  }
+  .narrative p {
+    font-family: var(--serif);
+    font-size: 22px;
+    line-height: 1.6;
+    color: var(--ink);
+    margin-bottom: 28px;
+    max-width: 720px;
+  }
+  .narrative p em {
+    font-style: italic;
+    color: var(--cinnabar);
+  }
+  .narrative .pull {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 32px;
+    color: var(--cinnabar);
+    line-height: 1.35;
+    margin: 60px 0;
+    letter-spacing: -.015em;
+    padding-left: 24px;
+    border-left: 3px solid var(--cinnabar);
+    max-width: 700px;
+  }
+  .narrative .closing {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: clamp(28px, 3.5vw, 44px);
+    line-height: 1.35;
+    color: var(--ink);
+    letter-spacing: -.015em;
+    margin-top: 80px;
+    max-width: 720px;
+  }
+  .narrative .closing em {
+    color: var(--cinnabar);
+  }
+
+  .narrative-cn {
+    margin-top: 80px;
+    padding-top: 80px;
+    border-top: 1px solid rgba(26,20,16,.15);
+    font-family: var(--serif-cn);
+    max-width: 720px;
+  }
+  .narrative-cn .cn-lead {
+    font-size: 32px;
+    font-weight: 600;
+    color: var(--cinnabar);
+    margin-bottom: 32px;
+    letter-spacing: .05em;
+  }
+  .narrative-cn p {
+    font-size: 19px;
+    line-height: 1.9;
+    color: var(--ink);
+    margin-bottom: 20px;
+    font-weight: 300;
+  }
+  .narrative-cn p strong {
+    color: var(--cinnabar);
+    font-weight: 500;
+  }
+  .narrative-cn .cn-closing {
+    font-size: 24px;
+    color: var(--cinnabar);
+    margin-top: 40px;
+    letter-spacing: .1em;
+    font-weight: 400;
+    text-align: center;
+  }
+
+  .divider-ornament {
+    text-align: center;
+    margin: 100px 0;
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 28px;
+    color: var(--cinnabar);
+    letter-spacing: .4em;
+    opacity: .7;
+  }
+
+  /* ════════════════════════════════════════════════════
+     CLOSING SIGNATURE
+     ════════════════════════════════════════════════════ */
+  .closing-section {
+    background: var(--cinnabar);
+    color: var(--paper);
+    padding: 200px 0;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .closing-section::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      radial-gradient(circle at 30% 40%, rgba(241,233,214,.06) 0 2px, transparent 3px) 0 0/9px 9px,
+      radial-gradient(circle at 70% 60%, rgba(241,233,214,.04) 0 1.5px, transparent 2.5px) 0 0/13px 13px;
+    pointer-events: none;
+    opacity: .9;
+  }
+  .closing-section > * { position: relative; z-index: 2; }
+  .closing-mark {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: clamp(140px, 20vw, 320px);
+    line-height: .9;
+    color: var(--paper);
+    letter-spacing: -.04em;
+    font-weight: 500;
+  }
+  .closing-seal {
+    display: inline-block;
+    width: 96px;
+    height: 96px;
+    background: var(--paper);
+    color: var(--cinnabar);
+    font-family: var(--serif-cn);
+    font-size: 56px;
+    line-height: 96px;
+    margin: 60px auto;
+    font-weight: 700;
+    border-radius: 4px;
+  }
+  .closing-tag {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: .4em;
+    color: rgba(241,233,214,.65);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .closing-cn {
+    font-family: var(--serif-cn);
+    font-size: 22px;
+    color: rgba(241,233,214,.85);
+    letter-spacing: .2em;
+    margin-top: 8px;
+  }
+  .closing-meta {
+    margin-top: 80px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .3em;
+    color: rgba(241,233,214,.4);
+    text-transform: uppercase;
+    line-height: 2;
+  }
+
+  /* Reveal animations */
+  .reveal {
+    opacity: 0;
+    transform: translateY(48px);
+    transition: opacity 1.2s cubic-bezier(0.16,1,0.3,1), transform 1.2s cubic-bezier(0.16,1,0.3,1);
+  }
+  .reveal.in {
+    opacity: 1;
+    transform: translateY(0);
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════
+     DOCUMENT HEAD
+     ════════════════════════════════════════════════ -->
+<header class="doc-head">
+  <div class="wrap">
+    <div>
+      <h1><em>Quill.</em></h1>
+      <div style="font-family: var(--serif-cn); font-weight: 300; font-size: 32px; margin-top: 16px; color: var(--tea); letter-spacing: .12em;">翎 · 翰</div>
+    </div>
+    <div class="meta">
+      <div><span>●</span> Visual Identity System</div>
+      <div>v 2.0 · Cinnabar Scroll</div>
+      <div>Manila · 2025</div>
+    </div>
+  </div>
+  <div class="wrap">
+    <nav class="toc">
+      <a href="#opener"><span>i</span>SEAL</a>
+      <a href="#story"><span>01</span>PHILOSOPHY</a>
+      <a href="#logo"><span>02</span>LOGO</a>
+      <a href="#color"><span>03</span>COLOR</a>
+      <a href="#type"><span>04</span>TYPE</a>
+      <a href="#apps"><span>05</span>APPS</a>
+      <a href="#narrative"><span>06</span>STORY</a>
+    </nav>
+  </div>
+</header>
+
+
+<!-- ════════════════════════════════════════════════
+     OPENER · SEAL
+     ════════════════════════════════════════════════ -->
+<section class="opener" id="opener">
+  <div class="wrap">
+    <div class="grid">
+      <div>
+        <div class="index">i · The Seal</div>
+        <div class="titles">
+          <div class="cn-title">翎</div>
+          <div class="en-title">Quill.</div>
+        </div>
+        <p class="tag">Every ledger begins<br>with a quill.</p>
+        <p class="tag-cn">每一份账册，<br>都始于一支笔。</p>
+      </div>
+      <div class="seal-display">
+        <!-- Cinnabar seal master mark - inspired by upload Direction A -->
+        <svg viewBox="0 0 360 360" width="100%" height="100%" style="max-width: 360px;" aria-label="Quill primary seal">
+          <defs>
+            <filter id="rough" x="-5%" y="-5%" width="110%" height="110%">
+              <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="5"/>
+              <feDisplacementMap in="SourceGraphic" scale="1.6"/>
+            </filter>
+          </defs>
+          <!-- Aged seal background with rough edge -->
+          <rect x="20" y="20" width="320" height="320" rx="10" fill="#b23a2b" filter="url(#rough)"/>
+          <!-- Quill mark inside: stylized Q with calligraphic tail -->
+          <g transform="translate(180 180)" fill="none" stroke="#f1e9d6" stroke-width="22" stroke-linecap="round">
+            <!-- Main Q circle -->
+            <ellipse cx="0" cy="-4" rx="80" ry="82"/>
+            <!-- Tail: like a quill stroke flicking down-right -->
+            <path d="M 30 30 Q 56 56 92 88"/>
+          </g>
+          <!-- Small accent dot to suggest the "nib touched paper" -->
+          <circle cx="290" cy="290" r="9" fill="#f1e9d6"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════
+     CH 01 · PHILOSOPHY
+     ════════════════════════════════════════════════ -->
+<section id="story">
+  <div class="ch-num">01</div>
+  <div class="wrap">
+    <div class="reveal">
+      <div class="ch-eyebrow">Chapter One · 哲学</div>
+      <h2 class="ch-title">Atelier <em>of</em><br>Restraint.</h2>
+      <p class="ch-sub">克制之手作。 — 一个矛盾孕育的视觉语言：用最古老的工具（羽毛笔）代表最新的技术（AI），用东方的笔墨传统承载西方的极简主义。</p>
+    </div>
+
+    <div class="story-grid reveal">
+      <h3 class="story-h">Five centuries of paperwork.<br>One <em>quill</em>.</h3>
+      <div>
+        <div class="story-body">
+          <p>From the Song dynasty scholar's brush to the Filipino clerk's ballpoint, the act of "signing off" has remained unchanged for half a millennium. <strong>Every business decision still requires a piece of paper, a signature, a seal.</strong></p>
+          <p>Quill is not here to replace paper. We are here to replace the <strong>burden</strong> of paper.</p>
+          <p>Our visual language is born from a contradiction: <em>the oldest tool</em> (a feather quill) representing the newest technology (AI). The Eastern ink tradition carrying Western minimalism. This contradiction is not our weakness—it is our <strong>soul</strong>.</p>
+        </div>
+        <div class="story-pull">
+          <strong>翰墨自此，非负担。</strong><br>
+          一笔一画，皆有所托。<br>
+          从宋人的砚台，到马尼拉的账册，<br>
+          书写的形式变了，但「签字」的本质没变。<br>
+          Quill 不是要取代纸笔，是要解放<strong>负担</strong>。
+        </div>
+      </div>
+    </div>
+
+    <div class="pillars reveal">
+      <div class="pillar">
+        <div class="pillar-id">Pillar 01</div>
+        <h3>形 与 空 <em>— Form & Space</em></h3>
+        <p>Every element must justify its existence. A line, a character, a stretch of white space — each decided with the focus of a calligrapher before brush meets paper.</p>
+        <p>80% 留白，承载 20% 内容。让眼睛得以呼吸，让思想得以沉淀。</p>
+      </div>
+      <div class="pillar">
+        <div class="pillar-id">Pillar 02</div>
+        <h3>墨 与 朱 <em>— Color & Material</em></h3>
+        <p>Five pigments, one ink stone. Aged paper, deep ink, the cinnabar of the seal, the bronze of detail, the linen of transition.</p>
+        <p>朱砂是品牌的「心跳」。出现得很少，但每一次出现都意味着「签字盖章」。</p>
+      </div>
+      <div class="pillar">
+        <div class="pillar-id">Pillar 03</div>
+        <h3>笔 与 痕 <em>— Craft & Texture</em></h3>
+        <p>Digital design has long forgotten the touch of the hand. Quill brings it back—through paper grain, brushstroke ends, and the optical adjustments of type at every size.</p>
+        <p>每一处细节都经得起 100 倍放大。这是奢侈品级的工艺标准。</p>
+      </div>
+      <div class="pillar">
+        <div class="pillar-id">Pillar 04</div>
+        <h3>节 与 律 <em>— Rhythm & Authority</em></h3>
+        <p>Still before motion. Large before small. Black before red. Major moments restrained; interactive moments where cinnabar appears — but never more than 5% of the canvas.</p>
+        <p>斜体（Italic）是 Quill 的灵魂—代表流动、书写、人的痕迹。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════
+     CH 02 · LOGO SYSTEM
+     ════════════════════════════════════════════════ -->
+<section class="logo-section" id="logo">
+  <div class="ch-num">02</div>
+  <div class="wrap">
+    <div class="reveal">
+      <div class="ch-eyebrow">Chapter Two · 标志</div>
+      <h2 class="ch-title">The Mark, <em>&amp;</em><br>the Press.</h2>
+      <p class="ch-sub">标志 与 印记。 — A primary seal mark, supported by four variants. Each speaks in a different room, but they all share one breath.</p>
+    </div>
+
+    <!-- PRIMARY -->
+    <div class="logo-primary reveal">
+      <div class="logo-primary-meta">PRIMARY · <span>朱砂主印</span> · For all official uses</div>
+      <div class="logo-primary-info">
+        Quill Master Mark<br>
+        v 1.0 · 2025
+      </div>
+      <!-- The master seal -->
+      <svg viewBox="0 0 360 360" width="320" height="320" aria-label="Quill master seal">
+        <defs>
+          <filter id="rough-master" x="-5%" y="-5%" width="110%" height="110%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="5"/>
+            <feDisplacementMap in="SourceGraphic" scale="1.6"/>
+          </filter>
+        </defs>
+        <rect x="20" y="20" width="320" height="320" rx="10" fill="#b23a2b" filter="url(#rough-master)"/>
+        <g transform="translate(180 180)" fill="none" stroke="#f1e9d6" stroke-width="22" stroke-linecap="round">
+          <ellipse cx="0" cy="-4" rx="80" ry="82"/>
+          <path d="M 30 30 Q 56 56 92 88"/>
+        </g>
+        <circle cx="290" cy="290" r="9" fill="#f1e9d6"/>
+      </svg>
+    </div>
+
+    <!-- VARIANTS -->
+    <div class="logo-variants reveal">
+      <!-- Variant 1: Wordmark on light -->
+      <div class="logo-var">
+        <svg viewBox="0 0 280 80" width="80%" height="80%" style="max-width: 220px;">
+          <text x="0" y="62" font-family="Cormorant Garamond, Georgia, serif" font-style="italic" font-weight="500" font-size="68" fill="#1a1410" letter-spacing="-2">Quill</text>
+          <circle cx="178" cy="60" r="5" fill="#b23a2b"/>
+        </svg>
+        <div class="name">Wordmark · Light</div>
+      </div>
+
+      <!-- Variant 2: Wordmark on dark -->
+      <div class="logo-var dark">
+        <svg viewBox="0 0 280 80" width="80%" height="80%" style="max-width: 220px;">
+          <text x="0" y="62" font-family="Cormorant Garamond, Georgia, serif" font-style="italic" font-weight="500" font-size="68" fill="#f1e9d6" letter-spacing="-2">Quill</text>
+          <circle cx="178" cy="60" r="5" fill="#b23a2b"/>
+        </svg>
+        <div class="name" style="color: rgba(241,233,214,.6);">Wordmark · Dark</div>
+      </div>
+
+      <!-- Variant 3: Chinese chop -->
+      <div class="logo-var cinnabar">
+        <svg viewBox="0 0 200 200" width="100" height="100">
+          <rect x="6" y="6" width="188" height="188" rx="6" fill="none" stroke="#f1e9d6" stroke-width="3"/>
+          <text x="100" y="135" text-anchor="middle" font-family="Noto Serif SC, serif" font-weight="700" font-size="100" fill="#f1e9d6">翎</text>
+        </svg>
+        <div class="name" style="color: rgba(241,233,214,.7);">Chop · CN Mark</div>
+      </div>
+
+      <!-- Variant 4: Q monogram only -->
+      <div class="logo-var tea">
+        <svg viewBox="0 0 200 200" width="120" height="120">
+          <g transform="translate(100 100)" fill="none" stroke="#1a1410" stroke-width="14" stroke-linecap="round">
+            <ellipse cx="0" cy="-2" rx="56" ry="58"/>
+            <path d="M 22 22 Q 42 42 64 66"/>
+          </g>
+          <circle cx="170" cy="170" r="6" fill="#b23a2b"/>
+        </svg>
+        <div class="name">Mark · Q only</div>
+      </div>
+    </div>
+
+    <!-- Construction explanation -->
+    <div class="logo-construction reveal">
+      <h4>构造原理 · CONSTRUCTION</h4>
+      <p>主印由三个元素组成：<strong>方形朱砂底</strong> · <strong>Q 字白色描边</strong>（一根椭圆 + 一道斜笔）· <strong>右下角的小圆点</strong>——代表笔尖落纸的瞬间。<br><br>这不是 SaaS 套路里那种"渐变+发光"。这是<strong>一千年来印章的语言</strong>，今天用现代制图工具重新做了一遍。当你的客户在合同上看到这个印，他知道：<strong>这件事，签完了</strong>。</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════
+     CH 03 · COLOR SYSTEM
+     ════════════════════════════════════════════════ -->
+<section id="color">
+  <div class="ch-num">03</div>
+  <div class="wrap">
+    <div class="reveal">
+      <div class="ch-eyebrow">Chapter Three · 色彩</div>
+      <h2 class="ch-title">Five Pigments,<br><em>One</em> Ink Stone.</h2>
+      <p class="ch-sub">五种颜色，源自古老的书写场景。每一种都有自己的角色，从不越界。整套配色系统的灵魂是 <strong>朱砂从不超过画面 5%</strong>。</p>
+    </div>
+
+    <div class="swatches reveal">
+      <div class="sw cinnabar">
+        <div>
+          <div class="role">PRIMARY · 印记</div>
+        </div>
+        <div>
+          <div class="name">Cinnabar</div>
+          <div class="cn">朱砂</div>
+          <div class="hex" style="margin-top: 12px;">#B23A2B</div>
+        </div>
+      </div>
+      <div class="sw ink">
+        <div>
+          <div class="role">BLACK · 墨</div>
+        </div>
+        <div>
+          <div class="name">Ink</div>
+          <div class="cn">墨</div>
+          <div class="hex" style="margin-top: 12px;">#1A1410</div>
+        </div>
+      </div>
+      <div class="sw paper">
+        <div>
+          <div class="role">BG · 纸</div>
+        </div>
+        <div>
+          <div class="name">Paper</div>
+          <div class="cn">纸</div>
+          <div class="hex" style="margin-top: 12px;">#F1E9D6</div>
+        </div>
+      </div>
+      <div class="sw tea">
+        <div>
+          <div class="role">ACCENT · 金</div>
+        </div>
+        <div>
+          <div class="name">Tea</div>
+          <div class="cn">茶</div>
+          <div class="hex" style="margin-top: 12px;">#C9A96E</div>
+        </div>
+      </div>
+      <div class="sw celadon">
+        <div>
+          <div class="role">RARE · 青</div>
+        </div>
+        <div>
+          <div class="name">Celadon</div>
+          <div class="cn">青瓷</div>
+          <div class="hex" style="margin-top: 12px;">#7A8A6C</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ratio-bar reveal">
+      <div class="ratio-bar-label">USAGE RATIO · 配色比例</div>
+      <div class="ratio-bar-strip">
+        <div style="background: #F1E9D6; flex: 60; color: #6b5d49;">PAPER 60%</div>
+        <div style="background: #1A1410; flex: 30; color: #f1e9d6;">INK 30%</div>
+        <div style="background: #C9A96E; flex: 5; color: #1a1410; font-size: 9px;">TEA 5%</div>
+        <div style="background: #B23A2B; flex: 3; color: #f1e9d6; font-size: 9px;">朱 3%</div>
+        <div style="background: #7A8A6C; flex: 2; color: #f1e9d6; font-size: 9px;">青 2%</div>
+      </div>
+      <p class="ratio-note">
+        这不是规则，是品味。<br>
+        当朱砂突破 5%，品牌就开始尖叫；当它退回 2%，品牌开始低语。<br>
+        我们要的是后者。
+      </p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════
+     CH 04 · TYPOGRAPHY
+     ════════════════════════════════════════════════ -->
+<section class="type-section" id="type">
+  <div class="ch-num">04</div>
+  <div class="wrap">
+    <div class="reveal">
+      <div class="ch-eyebrow">Chapter Four · 字体</div>
+      <h2 class="ch-title">Serif on paper,<br><em>song style</em> on chop.</h2>
+      <p class="ch-sub">四种字体，承担四种表达任务。它们彼此区分，但形成一个有机的整体。所有字体都免费，但用在一起就是奢侈品。</p>
+    </div>
+
+    <div class="type-row reveal">
+      <div class="type-meta">
+        <span class="name">Cormorant Garamond</span>
+        <span class="role">Display · 标题 / Logo</span>
+        <div>By Catharsis Fonts</div>
+        <div>SIL Open Font License</div>
+        <div>Free · Google Fonts</div>
+      </div>
+      <div>
+        <div class="type-display"><em>Paperwork,</em><br>signed off.</div>
+        <p class="type-note">温润的衬线字体，带着 16 世纪欧洲文人书房的气质。Italic 是它的灵魂——细而有力。所有 Quill 的英文标题都用这套字体。</p>
+      </div>
+    </div>
+
+    <div class="type-row reveal">
+      <div class="type-meta">
+        <span class="name">Noto Serif SC</span>
+        <span class="role">Chinese Display · 中文标题</span>
+        <div>By Google + Adobe</div>
+        <div>SIL Open Font License</div>
+        <div>Free · Google Fonts</div>
+      </div>
+      <div>
+        <div class="type-display-cn">翰墨自此，<br><em>非负担</em>。</div>
+        <p class="type-note">宋体的端正 + 微妙的衬线。和 Cormorant Garamond 形成完美的「中西呼应」。Weight 200-400 用于大标题，700-900 用于印章。</p>
+      </div>
+    </div>
+
+    <div class="type-row reveal">
+      <div class="type-meta">
+        <span class="name">DM Sans</span>
+        <span class="role">Body & UI · 正文 / 界面</span>
+        <div>By Indian Type Foundry</div>
+        <div>SIL Open Font License</div>
+        <div>Free · Google Fonts</div>
+      </div>
+      <div>
+        <div class="type-body-sample">
+          Quill 通过 AI 帮你处理所有政府文书工作。拍一张表格照片，系统自动从你的企业档案库填好所有字段，3 分钟生成可打印 PDF——本来需要 4 小时的事。
+        </div>
+        <p class="type-note">几何精准、字形开朗、不抢戏。所有 App 内、网页正文、说明文字都用这个。</p>
+      </div>
+    </div>
+
+    <div class="type-row reveal">
+      <div class="type-meta">
+        <span class="name">JetBrains Mono</span>
+        <span class="role">Mono · 技术细节 / 标签</span>
+        <div>By JetBrains</div>
+        <div>SIL Open Font License</div>
+        <div>Free · 开源</div>
+      </div>
+      <div>
+        <div class="type-mono-sample">
+          QUILL/PERMIT &middot; v1.0 &middot; MAYORS_PERMIT_QC &middot; CONFIDENCE 0.94<br>
+          BIR_2550M &middot; FILING_PERIOD 2025-Q2 &middot; STATUS: READY_FOR_REVIEW<br>
+          DOCUMENT_ID: doc_8821a · CREATED_AT: 2025-05-22T08:14:00+08:00
+        </div>
+        <p class="type-note">所有「机器说话」的地方——文件名、ID、时间戳、状态标签——都用它。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════
+     CH 05 · APPLICATIONS
+     ════════════════════════════════════════════════ -->
+<section class="apps-section" id="apps">
+  <div class="ch-num">05</div>
+  <div class="wrap">
+    <div class="reveal">
+      <div class="ch-eyebrow">Chapter Five · 应用</div>
+      <h2 class="ch-title">From the chop block,<br><em>to</em> the screen.</h2>
+      <p class="ch-sub">从印章石，到屏幕。 — Logo 不是终点，而是起点。同一套语言，在不同场景中应该有不同的发声方式。</p>
+    </div>
+
+    <!-- Row 1: Business card -->
+    <div class="apps reveal">
+      <!-- Business Card -->
+      <div class="app-card">
+        <div class="corner">01 · Card</div>
+        <svg viewBox="0 0 220 60" width="120" height="auto">
+          <text x="0" y="48" font-family="Cormorant Garamond, serif" font-style="italic" font-weight="500" font-size="54" fill="#1a1410" letter-spacing="-1.5">Quill</text>
+          <circle cx="140" cy="46" r="4" fill="#b23a2b"/>
+        </svg>
+        <div class="bot">
+          <div class="person">
+            <div class="name">Li Jianhua</div>
+            <div class="role">Founder · 创始人</div>
+          </div>
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; text-align: right; opacity: .7; line-height: 1.7; letter-spacing: .08em;">
+            hello@getquill.ai<br>
+            +63 ··· ····<br>
+            Manila · PH
+          </div>
+        </div>
+      </div>
+
+      <!-- App Screen -->
+      <div class="app-card dark">
+        <div class="grid-bg"></div>
+        <div class="corner" style="color: rgba(241,233,214,.5);">02 · App</div>
+        <div style="position: relative; z-index: 2;">
+          <div style="font-family: var(--mono); font-size: 9px; letter-spacing: .2em; color: rgba(241,233,214,.45); text-transform: uppercase; margin-bottom: 12px;">DETECTED · 94%</div>
+          <div style="font-family: var(--serif); font-style: italic; font-size: 32px; color: var(--paper); line-height: 1; margin-bottom: 16px;">BIR Form<br>2550M</div>
+          <div style="font-family: var(--sans); font-size: 12px; color: rgba(241,233,214,.6); line-height: 1.5;">Monthly VAT · 2025-Q2</div>
+        </div>
+        <div style="position: relative; z-index: 2; display: inline-flex; align-items: center; gap: 8px; background: var(--cinnabar); color: var(--paper); padding: 12px 18px; font-family: var(--mono); font-size: 10px; letter-spacing: .15em; border-radius: 2px; align-self: flex-start;">
+          FILL FROM ARCHIVE →
+        </div>
+      </div>
+
+      <!-- Seal envelope -->
+      <div class="app-card" style="background: #ebe1c9;">
+        <div class="corner">03 · Letter</div>
+        <div style="position: absolute; top: 32px; right: 32px; width: 56px; height: 56px; background: var(--cinnabar); border-radius: 3px; display: flex; align-items: center; justify-content: center;">
+          <span style="font-family: var(--serif-cn); font-weight: 700; color: var(--paper); font-size: 36px; line-height: 1;">翎</span>
+        </div>
+        <div style="margin-top: auto;">
+          <div style="font-family: var(--mono); font-size: 9px; letter-spacing: .25em; color: var(--muted); text-transform: uppercase; margin-bottom: 12px;">FROM</div>
+          <div style="font-family: var(--serif); font-style: italic; font-size: 24px; color: var(--ink); font-weight: 500;">Quill, Inc.</div>
+          <div style="font-family: var(--sans); font-size: 11px; color: var(--ink); line-height: 1.6; margin-top: 4px; opacity: .7;">Manila · Philippines</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: Poster + Web -->
+    <div class="app-row-2 reveal">
+      <div class="app-card" style="background: var(--cinnabar); color: var(--paper); aspect-ratio: 3/4;">
+        <div class="corner" style="color: rgba(241,233,214,.5);">04 · Poster</div>
+        <div style="font-family: var(--mono); font-size: 10px; letter-spacing: .25em; color: rgba(241,233,214,.7);">PRODUCT LAUNCH<br>Q4 · 2025</div>
+        <div>
+          <div style="font-family: var(--serif); font-style: italic; font-size: 56px; line-height: .95; color: var(--paper); letter-spacing: -.025em; margin-bottom: 12px;">
+            Two weeks,<br>
+            <span style="font-weight: 300;">becomes</span><br>
+            two hours.
+          </div>
+          <div style="width: 40px; height: 1px; background: var(--paper); margin: 24px 0; opacity: .4;"></div>
+          <div style="font-family: var(--serif-cn); font-size: 18px; color: rgba(241,233,214,.75); line-height: 1.6;">两周变两小时。<br>翎·办证 · 上线</div>
+        </div>
+        <svg viewBox="0 0 100 30" width="60">
+          <text x="0" y="24" font-family="Cormorant Garamond, serif" font-style="italic" font-weight="500" font-size="28" fill="#f1e9d6" letter-spacing="-1">Quill</text>
+          <circle cx="68" cy="22" r="3" fill="#f1e9d6"/>
+        </svg>
+      </div>
+
+      <div class="app-card" style="background: var(--paper); aspect-ratio: 3/4;">
+        <div class="corner">05 · Web</div>
+        <div style="font-family: var(--mono); font-size: 10px; letter-spacing: .2em; color: var(--muted); text-transform: uppercase;">getquill.ai</div>
+        <div>
+          <div style="font-family: var(--serif-cn); font-size: 28px; color: var(--cinnabar); font-weight: 500; letter-spacing: .08em;">翎</div>
+          <div style="font-family: var(--serif); font-style: italic; font-size: 48px; color: var(--ink); line-height: 1; margin-top: 16px; letter-spacing: -.02em;">
+            Paperwork,<br>
+            <em style="color: var(--cinnabar);">signed</em> off.
+          </div>
+          <div style="margin-top: 24px; font-family: var(--sans); font-size: 13px; color: var(--muted); line-height: 1.6;">The AI business OS for those who run things in Southeast Asia.</div>
+        </div>
+        <div style="display: inline-flex; align-items: center; gap: 8px; background: var(--ink); color: var(--paper); padding: 14px 22px; font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; align-self: flex-start; border-radius: 100px;">
+          GET STARTED →
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════
+     CH 06 · BRAND STORY
+     ════════════════════════════════════════════════ -->
+<section id="narrative">
+  <div class="ch-num">06</div>
+  <div class="wrap">
+    <div class="reveal">
+      <div class="ch-eyebrow">Chapter Six · 故事</div>
+      <h2 class="ch-title">The <em>Story</em>.</h2>
+      <p class="ch-sub">每个伟大的品牌都不是从产品开始的，而是从一个人和一个故事开始的。这是 Quill 的故事。</p>
+    </div>
+
+    <div class="narrative reveal">
+      <p class="lead">"在菲律宾，老板们最大的浪费不是时间，是<em>注意力</em>。"</p>
+
+      <p>2025 年 1 月，Manila 的所有商业老板都在做同一件事：续 <em>Mayor's Permit</em>。排队、填表、跑部门——这个流程已经存在了几十年，没有人质疑过它，因为<em>"一直都是这样"</em>。</p>
+
+      <p>但 Li Jianhua 觉得这件事不对劲。他家在菲律宾经营 35 年——250 间客房的酒店、PPF 贴膜店、建材批发、咖啡厅。他亲眼看着自己的会计、HR、前台，每年 1 月有 2 周时间几乎完全停摆，只为了<em>"填表"</em>。</p>
+
+      <p>他想：<em>这件事，AI 现在已经能做。为什么没有人做？</em></p>
+
+      <p>答案很简单：硅谷的 AI 公司不懂 BIR。他们的 ERP 解决的是美国问题——SaaS 公司的收入识别、上市公司的合规、连锁餐厅的库存。但东南亚 SME 老板真正想解决的——"<em>能不能不要每年浪费 2 周时间填政府表格</em>"——硅谷觉得太琐碎，看不上。</p>
+
+      <p>于是 Quill 诞生了。</p>
+
+      <div class="pull">
+        Quill — 羽毛笔。<br>
+        最古老的书写工具，<br>
+        承载最新的智能。
+      </div>
+
+      <p>我们用 AI 替代你公司里所有"<em>电脑能做却让人做</em>"的事。从拍照填表，到通话转 CRM，到银行自动对账，到会议自动出纪要——一个个模块加上来，最终组成一个完整的<em>企业大脑</em>。</p>
+
+      <p>但我们不叫自己"AI ERP"。<em>那只是技术。</em></p>
+
+      <p>我们叫自己 Quill，因为羽毛笔代表了一种<em>姿态</em>——慢一点，精细一点，有手感一点。即使在 AI 时代，我们依然相信：好的产品来自<em>手艺人</em>的反复打磨，不来自模型的随机生成。</p>
+
+      <p class="closing">
+        我们不是<em>在卖软件</em>。<br>
+        我们是在<em>卖回</em>你的<em>8 小时</em>。
+      </p>
+    </div>
+
+    <div class="divider-ornament reveal">⁂</div>
+
+    <div class="narrative-cn reveal">
+      <div class="cn-lead">翎，文人之笔。</div>
+      <p>中国古代，文人案头必置一支羽笔——那是身份，更是手艺。它代表着一个人对文字的尊重，对表达的精细，对每一笔起承转合的<strong>耐心</strong>。</p>
+      <p>今天的企业家也是文人。他们要写合同、签证件、谈判、决策——每一个动作都是一次"<strong>书写</strong>"。但他们没有时间。</p>
+      <p>Quill（翎），就是要做他们桌头的那支羽笔。<strong>替他们书写</strong>，让他们做更重要的事。</p>
+      <div class="cn-closing">— 翰墨自此，非负担 —</div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════
+     CLOSING
+     ════════════════════════════════════════════════ -->
+<section class="closing-section">
+  <div class="wrap">
+    <div class="closing-mark"><em>Quill.</em></div>
+    <div class="closing-seal">翎</div>
+    <div class="closing-tag">PAPERWORK · SIGNED · OFF</div>
+    <div class="closing-cn">翰 墨 自 此 · 非 负 担</div>
+    <div class="closing-meta">
+      Visual Identity System · v 2.0<br>
+      Cinnabar Scroll Edition<br>
+      Atelier of Restraint · 2025
+    </div>
+  </div>
+</section>
+
+<script>
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) entry.target.classList.add('in');
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -80px 0px' });
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>

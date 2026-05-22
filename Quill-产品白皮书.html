@@ -1,0 +1,2152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quill · 翎 — 不是ERP，是你公司的AI操作系统</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..700,0..100&family=Inter+Tight:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FAF8F3;
+    --bg-card: #ffffff;
+    --bg-soft: #F2EFE7;
+    --bg-warm: #EAE6D9;
+    --text: #0A0908;
+    --text-dim: #5a5650;
+    --text-muted: #847F6F;
+    --line: #D9D4C7;
+    --line-strong: #B5AE9A;
+    --accent: #0A0908;
+    --highlight: #8B0000;
+    --bronze: #A8804B;
+    --green: #15803d;
+    --display: 'Instrument Serif', Georgia, serif;
+    --serif-cn: 'Noto Serif SC', serif;
+    --sans: 'Inter Tight', -apple-system, sans-serif;
+    --mono: 'JetBrains Mono', 'SF Mono', monospace;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    line-height: 1.5;
+    overflow-x: hidden;
+    font-feature-settings: "ss01";
+    cursor: default;
+  }
+  ::selection { background: var(--text); color: var(--bg); }
+
+  /* Custom cursor on big interactive elements (desktop only) */
+  @media (hover: hover) {
+    a, button, .principle, .price, .moment, .module-row {
+      cursor: pointer;
+    }
+  }
+
+  /* Soft grain background */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.85' seed='2'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1;
+    mix-blend-mode: multiply;
+  }
+
+  /* Cursor blob effect (subtle) */
+  .cursor-blob {
+    position: fixed;
+    width: 500px; height: 500px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(194,65,12,0.05) 0%, transparent 70%);
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    transition: opacity 0.4s;
+    z-index: 2;
+    will-change: transform;
+    filter: blur(40px);
+    opacity: 0;
+  }
+  @media (hover: hover) {
+    body:hover .cursor-blob { opacity: 1; }
+  }
+
+  /* Container */
+  .container {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 80px;
+    position: relative;
+    z-index: 5;
+  }
+  @media (max-width: 768px) { .container { padding: 0 24px; } }
+
+  section { padding: 160px 0; }
+  section + section { padding-top: 0; }
+
+  /* Typography */
+  .display {
+    font-family: var(--display);
+    font-weight: 400;
+    
+  }
+  .display-italic {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 400;
+    
+  }
+
+  /* Eyebrow */
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 40px;
+  }
+  .eyebrow::before {
+    content: '';
+    width: 32px;
+    height: 1px;
+    background: var(--text);
+    transition: width 0.6s var(--ease-out);
+  }
+  .reveal.in-view .eyebrow::before {
+    width: 32px;
+    animation: lineGrow 0.8s var(--ease-out);
+  }
+  @keyframes lineGrow { from { width: 0; } to { width: 32px; } }
+
+  /* ===== NAV ===== */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    backdrop-filter: blur(24px) saturate(1.5);
+    -webkit-backdrop-filter: blur(24px) saturate(1.5);
+    background: rgba(250,250,247,0.85);
+    border-bottom: 1px solid rgba(0,0,0,0.04);
+    transition: transform 0.4s var(--ease-out);
+  }
+  nav.hidden { transform: translateY(-100%); }
+  nav .nav-inner {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 20px 80px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 32px;
+  }
+  .nav-logo {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 28px;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    text-decoration: none;
+    position: relative;
+  }
+  .nav-logo .dot { color: var(--highlight); }
+  .nav-logo::after {
+    content: '';
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    background: var(--highlight);
+    border-radius: 50%;
+    margin-left: 4px;
+    vertical-align: baseline;
+    transform: translateY(-1px);
+  }
+  .nav-links {
+    display: flex;
+    gap: 36px;
+    font-size: 14px;
+  }
+  .nav-links a {
+    color: var(--text-dim);
+    text-decoration: none;
+    transition: color 0.2s;
+    font-weight: 500;
+    position: relative;
+  }
+  .nav-links a::after {
+    content: '';
+    position: absolute;
+    bottom: -4px; left: 0;
+    width: 0; height: 1px;
+    background: var(--text);
+    transition: width 0.3s var(--ease-out);
+  }
+  .nav-links a:hover { color: var(--text); }
+  .nav-links a:hover::after { width: 100%; }
+
+  /* Language switcher */
+  .lang-switch {
+    display: inline-flex;
+    background: rgba(0,0,0,0.04);
+    border-radius: 100px;
+    padding: 4px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    position: relative;
+  }
+  .lang-switch button {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    padding: 8px 16px;
+    cursor: pointer;
+    border-radius: 100px;
+    transition: color 0.3s;
+    z-index: 2;
+    position: relative;
+  }
+  .lang-switch button.active { color: var(--bg); }
+  .lang-switch::before {
+    content: '';
+    position: absolute;
+    top: 4px; left: 4px;
+    width: calc(50% - 4px);
+    height: calc(100% - 8px);
+    background: var(--text);
+    border-radius: 100px;
+    transition: transform 0.4s var(--ease-out);
+    z-index: 1;
+  }
+  .lang-switch[data-lang="en"]::before { transform: translateX(100%); }
+
+  .nav-cta {
+    background: var(--text);
+    color: var(--bg);
+    padding: 10px 22px;
+    border-radius: 100px;
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.3s var(--ease-out);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .nav-cta:hover {
+    transform: scale(1.05);
+    box-shadow: 0 12px 30px -8px rgba(139,0,0,0.3);
+  }
+  .nav-cta .arrow {
+    display: inline-block;
+    transition: transform 0.3s var(--ease-out);
+  }
+  .nav-cta:hover .arrow { transform: translateX(4px); }
+
+  @media (max-width: 968px) {
+    nav .nav-inner { padding: 16px 24px; }
+    .nav-links { display: none; }
+  }
+  @media (max-width: 600px) {
+    .nav-cta { display: none; }
+  }
+
+  /* ===== HERO ===== */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    padding-top: 100px;
+    position: relative;
+  }
+  .hero h1 {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: clamp(54px, 9vw, 156px);
+    line-height: 0.92;
+    letter-spacing: -0.04em;
+    margin: 24px 0 48px;
+    max-width: 1100px;
+    
+  }
+  .hero h1 em {
+    font-style: italic;
+    font-weight: 400;
+    color: var(--highlight);
+    position: relative;
+  }
+  .hero h1 .light {
+    color: var(--text-muted);
+  }
+
+  /* Animated underline on hero */
+  .hero h1 em::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0;
+    width: 100%; height: 6px;
+    background: var(--highlight);
+    opacity: 0.15;
+    border-radius: 4px;
+    transform-origin: left;
+    animation: underlineSlide 1.2s var(--ease-out) 1.5s both;
+  }
+  @keyframes underlineSlide {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+  }
+
+  .hero-cn-mark {
+    font-family: var(--serif-cn);
+    font-weight: 200;
+    font-size: clamp(48px, 7vw, 96px);
+    color: var(--highlight);
+    line-height: 1;
+    margin: 24px 0 48px;
+    letter-spacing: 0.1em;
+    opacity: 0;
+    animation: heroIn 1s var(--ease-out) 0.5s forwards;
+  }
+  .hero-sub {
+    font-size: 22px;
+    color: var(--text-dim);
+    max-width: 680px;
+    line-height: 1.5;
+    margin-bottom: 60px;
+    font-weight: 400;
+  }
+  .hero-buttons {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 18px 32px;
+    border-radius: 100px;
+    font-size: 15px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.3s var(--ease-out);
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-primary {
+    background: var(--text);
+    color: var(--bg);
+  }
+  .btn-primary::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--highlight);
+    transform: translateY(100%);
+    transition: transform 0.4s var(--ease-out);
+    z-index: 1;
+  }
+  .btn-primary > * { position: relative; z-index: 2; }
+  .btn-primary:hover {
+    transform: scale(1.03);
+    box-shadow: 0 20px 40px -10px rgba(0,0,0,0.2);
+  }
+  .btn-primary:hover::before { transform: translateY(0); }
+  .btn-primary span { position: relative; z-index: 2; }
+  .btn-primary .arrow {
+    transition: transform 0.3s var(--ease-out);
+    position: relative;
+    z-index: 2;
+  }
+  .btn-primary:hover .arrow { transform: translateX(6px); }
+  .btn-secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--line-strong);
+  }
+  .btn-secondary:hover {
+    background: var(--bg-soft);
+    border-color: var(--text);
+    transform: scale(1.02);
+  }
+
+  /* Hero meta */
+  .hero-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    margin-top: 120px;
+    padding-top: 40px;
+    border-top: 1px solid var(--line);
+  }
+  @media (max-width: 768px) { .hero-meta-grid { grid-template-columns: repeat(2, 1fr); gap: 32px; } }
+  .hero-meta-item {
+    transition: transform 0.4s var(--ease-out);
+  }
+  .hero-meta-item:hover { transform: translateY(-4px); }
+  .hero-meta-item .label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .hero-meta-item .value {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 32px;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  .hero-meta-item .value em { font-style: italic; color: var(--highlight); }
+
+  .hero-bg-mark {
+    position: absolute;
+    right: -60px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: var(--serif-cn);
+    font-weight: 200;
+    font-size: clamp(400px, 50vw, 640px);
+    color: var(--bg-warm);
+    line-height: 0.9;
+    user-select: none;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.5;
+    letter-spacing: 0;
+  }
+  @media (max-width: 968px) { .hero-bg-mark { right: -100px; opacity: 0.3; } }
+
+  /* Animated scroll indicator */
+  .scroll-indicator {
+    position: absolute;
+    bottom: 40px; left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    animation: bounce 2s ease-in-out infinite;
+  }
+  @keyframes bounce {
+    0%, 100% { transform: translate(-50%, 0); }
+    50% { transform: translate(-50%, 8px); }
+  }
+  .scroll-indicator::after {
+    content: '';
+    width: 1px;
+    height: 32px;
+    background: var(--text-muted);
+  }
+
+  /* ===== SECTION HEAD ===== */
+  .section-head {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr;
+    gap: 100px;
+    margin-bottom: 120px;
+    align-items: start;
+  }
+  @media (max-width: 968px) { .section-head { grid-template-columns: 1fr; gap: 40px; margin-bottom: 80px; } }
+  .section-head h2 {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: clamp(48px, 7vw, 112px);
+    line-height: 0.92;
+    letter-spacing: -0.035em;
+    
+  }
+  .section-head h2 em {
+    font-style: italic;
+    font-weight: 400;
+    color: var(--highlight);
+  }
+  .section-head h2 .light { color: var(--text-muted); }
+  .section-head .intro {
+    font-size: 22px;
+    color: var(--text-dim);
+    line-height: 1.5;
+    max-width: 560px;
+    padding-top: 28px;
+    font-weight: 400;
+  }
+  .section-head .intro strong { color: var(--text); font-weight: 600; }
+
+  /* ===== EDITORIAL QUOTE ===== */
+  .editorial-quote {
+    margin: 80px 0;
+    padding: 0;
+    position: relative;
+  }
+  .editorial-quote::before {
+    content: '\201C';
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 280px;
+    line-height: 1;
+    position: absolute;
+    top: -80px; left: -40px;
+    color: var(--highlight);
+    opacity: 0.15;
+    pointer-events: none;
+  }
+  .editorial-quote .text {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 300;
+    font-size: clamp(32px, 5vw, 64px);
+    line-height: 1.15;
+    letter-spacing: -0.025em;
+    color: var(--text);
+    max-width: 1100px;
+    margin-bottom: 24px;
+    position: relative;
+  }
+  .editorial-quote .text em {
+    font-style: italic;
+    color: var(--highlight);
+    font-weight: 400;
+  }
+  .editorial-quote .attr {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  /* ===== STATS ===== */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    margin: 100px 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  @media (max-width: 768px) { .stats-row { grid-template-columns: 1fr; } }
+  .stat {
+    padding: 72px 32px;
+    border-right: 1px solid var(--line);
+    text-align: center;
+    transition: background 0.4s var(--ease-out);
+    cursor: default;
+  }
+  .stat:last-child { border-right: none; }
+  .stat:hover { background: var(--bg-card); }
+  @media (max-width: 768px) {
+    .stat { border-right: none; border-bottom: 1px solid var(--line); }
+    .stat:last-child { border-bottom: none; }
+  }
+  .stat .num {
+    font-family: var(--display);
+    font-weight: 400;
+    font-style: italic;
+    font-size: clamp(64px, 9vw, 128px);
+    line-height: 1;
+    letter-spacing: -0.04em;
+    margin-bottom: 28px;
+    color: var(--text);
+    transition: color 0.3s;
+  }
+  .stat:hover .num { color: var(--highlight); }
+  .stat .num small {
+    font-size: 0.5em;
+    color: var(--text-muted);
+    font-style: normal;
+  }
+  .stat .label {
+    font-size: 16px;
+    color: var(--text-dim);
+    max-width: 260px;
+    margin: 0 auto;
+    line-height: 1.5;
+  }
+
+  /* ===== TIMELINE ===== */
+  .timeline {
+    margin-top: 80px;
+  }
+  .timeline-item {
+    display: grid;
+    grid-template-columns: 120px 80px 1fr;
+    gap: 40px;
+    padding: 32px 0;
+    border-bottom: 1px solid var(--line);
+    align-items: center;
+    transition: padding-left 0.4s var(--ease-out), background 0.4s var(--ease-out);
+  }
+  .timeline-item:first-child { border-top: 1px solid var(--line); }
+  .timeline-item:hover {
+    padding-left: 24px;
+    background: linear-gradient(90deg, rgba(194,65,12,0.04), transparent);
+  }
+  @media (max-width: 768px) {
+    .timeline-item { grid-template-columns: 80px 1fr; gap: 24px; }
+    .timeline-item .icon-cell { display: none; }
+  }
+  .timeline-time {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+  }
+  .timeline-icon {
+    font-size: 32px;
+    filter: grayscale(0.3);
+    transition: filter 0.3s, transform 0.4s var(--ease-out);
+  }
+  .timeline-item:hover .timeline-icon {
+    filter: grayscale(0);
+    transform: scale(1.15);
+  }
+  .timeline-text {
+    font-size: 20px;
+    line-height: 1.4;
+    color: var(--text);
+    letter-spacing: -0.005em;
+  }
+
+  /* ===== PRINCIPLES ===== */
+  .principles {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    margin-top: 60px;
+  }
+  @media (max-width: 768px) { .principles { grid-template-columns: 1fr; } }
+  .principle {
+    background: var(--bg);
+    padding: 56px 40px;
+    transition: background 0.4s var(--ease-out), transform 0.4s var(--ease-out);
+    position: relative;
+    overflow: hidden;
+  }
+  .principle::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(194,65,12,0.04), transparent);
+    transition: left 0.8s var(--ease-out);
+  }
+  .principle:hover::before { left: 100%; }
+  .principle:hover { background: var(--bg-card); }
+  .principle-num {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.2em;
+    margin-bottom: 32px;
+    transition: color 0.3s;
+  }
+  .principle:hover .principle-num { color: var(--highlight); }
+  .principle h3 {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 40px;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin-bottom: 20px;
+    transition: transform 0.4s var(--ease-out);
+  }
+  .principle:hover h3 { transform: translateX(4px); }
+  .principle h3 em {
+    font-style: italic;
+    color: var(--highlight);
+  }
+  .principle p {
+    color: var(--text-dim);
+    font-size: 17px;
+    line-height: 1.55;
+    max-width: 420px;
+  }
+
+  /* ===== MAGIC MOMENTS ===== */
+  .moments { margin-top: 80px; }
+  .moment {
+    padding: 100px 0;
+    border-top: 1px solid var(--line);
+    transition: background 0.4s;
+  }
+  .moment:last-child { border-bottom: 1px solid var(--line); }
+  .moment-header {
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    gap: 40px;
+    margin-bottom: 60px;
+  }
+  @media (max-width: 768px) { .moment-header { grid-template-columns: 1fr; gap: 16px; } }
+  .moment-number {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 96px;
+    font-weight: 300;
+    line-height: 1;
+    color: var(--text-muted);
+    letter-spacing: -0.03em;
+    transition: color 0.4s var(--ease-out);
+  }
+  .moment:hover .moment-number { color: var(--highlight); }
+  .moment-title-block h3 {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: clamp(40px, 6vw, 84px);
+    line-height: 0.95;
+    letter-spacing: -0.035em;
+    margin-bottom: 24px;
+    
+  }
+  .moment-title-block h3 em {
+    font-style: italic;
+    font-weight: 400;
+    color: var(--highlight);
+  }
+  .moment-title-block p {
+    font-size: 20px;
+    color: var(--text-dim);
+    line-height: 1.5;
+    max-width: 800px;
+  }
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 60px;
+  }
+  @media (max-width: 768px) { .compare { grid-template-columns: 1fr; } }
+  .compare-card {
+    padding: 40px;
+    border-radius: 8px;
+    background: var(--bg-soft);
+    transition: transform 0.4s var(--ease-out), box-shadow 0.4s var(--ease-out);
+  }
+  .compare-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px -16px rgba(0,0,0,0.08);
+  }
+  .compare-card.after {
+    background: var(--text);
+    color: var(--bg);
+  }
+  .compare-card.after:hover {
+    box-shadow: 0 20px 40px -16px rgba(0,0,0,0.4);
+  }
+  .compare-card.after .compare-label { color: rgba(250,250,247,0.5); }
+  .compare-card.after .compare-list li { color: var(--bg); border-color: rgba(250,250,247,0.1); }
+  .compare-card.after .compare-list li::before { background: var(--highlight); }
+  .compare-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+  }
+  .compare-list { list-style: none; }
+  .compare-list li {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 16px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    line-height: 1.5;
+    transition: transform 0.3s var(--ease-out);
+  }
+  .compare-card:hover .compare-list li { transform: translateX(4px); }
+  .compare-card:hover .compare-list li:nth-child(2) { transition-delay: 0.05s; }
+  .compare-card:hover .compare-list li:nth-child(3) { transition-delay: 0.1s; }
+  .compare-card:hover .compare-list li:nth-child(4) { transition-delay: 0.15s; }
+  .compare-card:hover .compare-list li:nth-child(5) { transition-delay: 0.2s; }
+  .compare-list li:last-child { border-bottom: none; }
+  .compare-list li::before {
+    content: '';
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    margin-top: 9px;
+    flex-shrink: 0;
+  }
+
+  /* ===== MODULES TABLE ===== */
+  .modules-table {
+    margin-top: 60px;
+    width: 100%;
+    border-top: 1px solid var(--line);
+  }
+  .module-row {
+    display: grid;
+    grid-template-columns: 80px 1fr 240px 120px;
+    gap: 32px;
+    padding: 28px 0;
+    border-bottom: 1px solid var(--line);
+    align-items: center;
+    transition: all 0.3s var(--ease-out);
+    position: relative;
+  }
+  .module-row::before {
+    content: '';
+    position: absolute;
+    left: -24px; top: 0;
+    width: 4px; height: 100%;
+    background: var(--highlight);
+    transform: scaleY(0);
+    transition: transform 0.3s var(--ease-out);
+    transform-origin: center;
+  }
+  @media (max-width: 968px) {
+    .module-row { grid-template-columns: 60px 1fr 100px; }
+    .module-row .desc-col { display: none; }
+  }
+  .module-row:hover {
+    padding-left: 24px;
+    background: linear-gradient(90deg, rgba(194,65,12,0.04), transparent);
+  }
+  .module-row:hover::before { transform: scaleY(1); }
+  .module-id {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    transition: color 0.3s;
+  }
+  .module-row:hover .module-id { color: var(--highlight); }
+  .module-id.star { color: var(--highlight); font-weight: 600; }
+  .module-name {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 22px;
+    letter-spacing: -0.015em;
+  }
+  .module-name em { font-style: italic; }
+  .module-name .star {
+    color: var(--highlight);
+    margin-right: 6px;
+  }
+  .module-desc {
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+  .module-phase {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: right;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* ===== WHY US ===== */
+  .why-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 100px;
+    margin-top: 80px;
+  }
+  @media (max-width: 968px) { .why-section { grid-template-columns: 1fr; gap: 60px; } }
+  .why-block h3 {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 300;
+    font-size: 80px;
+    letter-spacing: -0.03em;
+    margin-bottom: 48px;
+    line-height: 1;
+    color: var(--highlight);
+  }
+  .why-item {
+    padding: 28px 0;
+    border-bottom: 1px solid var(--line);
+    transition: padding 0.3s var(--ease-out);
+  }
+  .why-item:hover {
+    padding-left: 16px;
+  }
+  .why-item:last-child { border-bottom: none; }
+  .why-item h4 {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: 22px;
+    letter-spacing: -0.015em;
+    margin-bottom: 10px;
+  }
+  .why-item p {
+    color: var(--text-dim);
+    font-size: 16px;
+    line-height: 1.55;
+  }
+
+  /* ===== PRICING ===== */
+  .pricing {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-top: 80px;
+  }
+  @media (max-width: 1024px) { .pricing { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 600px) { .pricing { grid-template-columns: 1fr; } }
+  .price {
+    padding: 40px 32px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    transition: all 0.4s var(--ease-out);
+    position: relative;
+    overflow: hidden;
+  }
+  .price::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 4px;
+    background: var(--highlight);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.5s var(--ease-out);
+  }
+  .price:hover {
+    border-color: var(--text);
+    transform: translateY(-8px);
+    box-shadow: 0 40px 80px -20px rgba(0,0,0,0.15);
+  }
+  .price:hover::after { transform: scaleX(1); }
+  .price.featured {
+    background: var(--text);
+    color: var(--bg);
+    border-color: var(--text);
+    position: relative;
+  }
+  .price.featured::before {
+    content: attr(data-badge);
+    position: absolute;
+    top: -10px; right: 20px;
+    background: var(--highlight);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    z-index: 2;
+  }
+  .price-name {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+  }
+  .price.featured .price-name { color: rgba(250,250,247,0.5); }
+  .price-amount {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 56px;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    margin-bottom: 4px;
+  }
+  .price-amount .light {
+    color: var(--text-muted);
+    font-size: 0.5em;
+  }
+  .price.featured .price-amount .light { color: rgba(250,250,247,0.4); }
+  .price-unit {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+  }
+  .price.featured .price-unit { color: rgba(250,250,247,0.5); }
+  .price-desc {
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.5;
+    margin-bottom: 24px;
+    min-height: 50px;
+  }
+  .price.featured .price-desc { color: rgba(250,250,247,0.8); }
+  .price-list {
+    list-style: none;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+  }
+  .price.featured .price-list { border-color: rgba(250,250,247,0.15); }
+  .price-list li {
+    font-size: 13px;
+    color: var(--text-dim);
+    padding: 8px 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .price.featured .price-list li { color: rgba(250,250,247,0.8); }
+  .price-list li::before {
+    content: '→';
+    color: var(--highlight);
+    flex-shrink: 0;
+    font-family: var(--mono);
+  }
+
+  /* ===== ROI ===== */
+  .roi {
+    margin-top: 120px;
+    padding: 60px;
+    background: var(--bg-card);
+    border-radius: 16px;
+    border: 1px solid var(--line);
+  }
+  @media (max-width: 768px) { .roi { padding: 32px 24px; overflow-x: auto; } }
+  .roi-title {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 48px;
+    letter-spacing: -0.025em;
+    margin-bottom: 8px;
+  }
+  .roi-sub {
+    color: var(--text-dim);
+    margin-bottom: 40px;
+    font-size: 17px;
+  }
+  .roi-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 600px;
+  }
+  .roi-table th {
+    text-align: left;
+    padding: 16px 20px;
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--line-strong);
+  }
+  .roi-table td {
+    padding: 20px 20px;
+    border-bottom: 1px solid var(--line);
+    font-size: 15px;
+    color: var(--text-dim);
+  }
+  .roi-table tr:hover td {
+    background: var(--bg-soft);
+  }
+  .roi-table .savings {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 20px;
+    color: var(--green);
+    text-align: right;
+    font-weight: 500;
+  }
+  .roi-table tr.total td {
+    font-weight: 600;
+    font-size: 18px;
+    color: var(--text);
+    border-bottom: none;
+    padding-top: 24px;
+  }
+  .roi-table tr.total .savings { font-size: 28px; }
+
+  /* ===== CTA ===== */
+  .cta-section {
+    text-align: center;
+    padding: 200px 0;
+    background: var(--text);
+    color: var(--bg);
+    margin-top: 100px;
+    position: relative;
+    overflow: hidden;
+  }
+  .cta-section::before {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 1200px; height: 1200px;
+    background: radial-gradient(circle, rgba(194,65,12,0.15), transparent 60%);
+    transform: translate(-50%, -50%);
+    animation: pulse 6s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.6; }
+    50% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+  }
+  .cta-section .container { position: relative; z-index: 2; }
+  .cta-section .eyebrow {
+    color: rgba(250,250,247,0.5);
+    justify-content: center;
+    display: inline-flex;
+  }
+  .cta-section .eyebrow::before { background: rgba(250,250,247,0.5); }
+  .cta-section h2 {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: clamp(48px, 8vw, 120px);
+    line-height: 1;
+    letter-spacing: -0.04em;
+    max-width: 1000px;
+    margin: 0 auto 60px;
+    
+  }
+  .cta-section h2 em {
+    font-style: italic;
+    color: var(--highlight);
+  }
+  .cta-buttons {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .cta-section .btn-primary {
+    background: var(--bg);
+    color: var(--text);
+  }
+  .cta-section .btn-primary::before { background: var(--highlight); }
+  .cta-section .btn-primary:hover { color: var(--bg); }
+  .cta-section .btn-secondary {
+    background: transparent;
+    color: var(--bg);
+    border: 1px solid rgba(250,250,247,0.3);
+  }
+  .cta-section .btn-secondary:hover { border-color: var(--bg); background: rgba(250,250,247,0.1); }
+  .cta-seal {
+    font-family: var(--serif-cn);
+    font-size: 18px;
+    color: var(--highlight);
+    letter-spacing: 0.3em;
+    margin-bottom: 60px;
+    margin-top: -40px;
+  }
+  body[data-current-lang="en"] .cta-seal { 
+    font-family: var(--mono);
+    letter-spacing: 0.25em;
+  }
+
+  /* ===== FOOTER ===== */
+  footer {
+    background: var(--bg);
+    padding: 80px 0 40px;
+    border-top: 1px solid var(--line);
+  }
+  .footer-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 60px;
+    margin-bottom: 60px;
+  }
+  @media (max-width: 768px) { .footer-grid { grid-template-columns: 1fr 1fr; gap: 40px; } }
+  .footer-cn {
+    font-family: var(--serif-cn);
+    font-size: 32px;
+    color: var(--highlight);
+    margin: -8px 0 16px;
+    letter-spacing: 0.1em;
+    font-weight: 300;
+  }
+  .footer-logo {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 64px;
+    line-height: 1;
+    margin-bottom: 20px;
+    letter-spacing: -0.03em;
+    color: var(--highlight);
+  }
+  .footer-col h5 {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .footer-col a, .footer-col p {
+    display: block;
+    font-size: 14px;
+    color: var(--text-dim);
+    text-decoration: none;
+    line-height: 2;
+    transition: color 0.2s, transform 0.2s;
+  }
+  .footer-col a:hover {
+    color: var(--highlight);
+    transform: translateX(4px);
+  }
+  .footer-bottom {
+    padding-top: 32px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  /* ===== REVEAL ANIMATIONS ===== */
+  .reveal {
+    opacity: 0;
+    transform: translateY(60px);
+    transition: opacity 1s var(--ease-out), transform 1s var(--ease-out);
+  }
+  .reveal.in-view {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .reveal-stagger > * {
+    opacity: 0;
+    transform: translateY(40px);
+    transition: opacity 0.8s var(--ease-out), transform 0.8s var(--ease-out);
+  }
+  .reveal-stagger.in-view > * { opacity: 1; transform: translateY(0); }
+  .reveal-stagger.in-view > *:nth-child(1) { transition-delay: 0s; }
+  .reveal-stagger.in-view > *:nth-child(2) { transition-delay: 0.08s; }
+  .reveal-stagger.in-view > *:nth-child(3) { transition-delay: 0.16s; }
+  .reveal-stagger.in-view > *:nth-child(4) { transition-delay: 0.24s; }
+  .reveal-stagger.in-view > *:nth-child(5) { transition-delay: 0.32s; }
+  .reveal-stagger.in-view > *:nth-child(6) { transition-delay: 0.4s; }
+
+  /* Hero animations */
+  .hero .eyebrow { opacity: 0; animation: heroIn 0.8s var(--ease-out) 0.1s forwards; }
+  .hero h1 { opacity: 0; animation: heroIn 1s var(--ease-out) 0.3s forwards; }
+  .hero-cn-mark {
+    font-family: var(--serif-cn);
+    font-weight: 200;
+    font-size: clamp(48px, 7vw, 96px);
+    color: var(--highlight);
+    line-height: 1;
+    margin: 24px 0 48px;
+    letter-spacing: 0.1em;
+    opacity: 0;
+    animation: heroIn 1s var(--ease-out) 0.5s forwards;
+  }
+  .hero-sub { opacity: 0; animation: heroIn 0.8s var(--ease-out) 0.6s forwards; }
+  .hero-buttons { opacity: 0; animation: heroIn 0.8s var(--ease-out) 0.8s forwards; }
+  .hero-meta-grid { opacity: 0; animation: heroIn 0.8s var(--ease-out) 1s forwards; }
+  @keyframes heroIn {
+    from { opacity: 0; transform: translateY(40px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Number counter animation */
+  .counter { display: inline-block; }
+
+  @media print {
+    nav, .cta-buttons, .hero-buttons, .scroll-indicator, body::before, .cursor-blob { display: none !important; }
+    section { padding: 40px 0; page-break-inside: avoid; }
+    .hero { min-height: auto; padding-top: 40px; }
+    * { color: black !important; background: white !important; }
+    .price.featured, .compare-card.after, .cta-section { background: #fafafa !important; color: black !important; }
+  }
+
+  /* Language reveal */
+  [data-lang-content="zh"], [data-lang-content="en"] { display: inline; }
+  body[data-current-lang="zh"] [data-lang-content="en"] { display: none; }
+  body[data-current-lang="en"] [data-lang-content="zh"] { display: none; }
+</style>
+</head>
+<body data-current-lang="zh">
+
+<div class="cursor-blob" id="cursorBlob"></div>
+
+<!-- NAV -->
+<nav id="nav">
+  <div class="nav-inner">
+    <a href="#" class="nav-logo">Quill</a>
+    <div class="nav-links">
+      <a href="#problem"><span data-lang-content="zh">问题</span><span data-lang-content="en">Problem</span></a>
+      <a href="#vision"><span data-lang-content="zh">理念</span><span data-lang-content="en">Vision</span></a>
+      <a href="#magic"><span data-lang-content="zh">魔法时刻</span><span data-lang-content="en">Magic</span></a>
+      <a href="#modules"><span data-lang-content="zh">模块</span><span data-lang-content="en">Modules</span></a>
+      <a href="#pricing"><span data-lang-content="zh">定价</span><span data-lang-content="en">Pricing</span></a>
+    </div>
+    <div style="display:flex; align-items:center; gap:16px;">
+      <div class="lang-switch" data-lang="zh">
+        <button data-lang-btn="zh" class="active">中</button>
+        <button data-lang-btn="en">EN</button>
+      </div>
+      <a href="#contact" class="nav-cta">
+        <span data-lang-content="zh">免费咨询</span>
+        <span data-lang-content="en">Get Demo</span>
+        <span class="arrow">→</span>
+      </a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg-mark">翎</div>
+  <div class="container">
+    <div class="eyebrow"><span data-lang-content="zh">产品白皮书 · v1.0 · 2025</span><span data-lang-content="en">Product Whitepaper · v1.0 · 2025</span></div>
+    <h1 class="display">
+      <span data-lang-content="zh">不是<span class="light">ERP，</span><br>是你公司的<br><em>AI操作系统</em>。</span>
+      <span data-lang-content="en"><span class="light">Not</span> ERP.<br>An <em>operating</em><br>system.</span>
+    </h1>
+    <div class="hero-cn-mark">
+      <span data-lang-content="zh">翎</span>
+      <span data-lang-content="en">翎</span>
+    </div>
+    <p class="hero-sub">
+      <span data-lang-content="zh">为菲律宾及东南亚SME打造的AI驱动企业大脑。不是另一个ERP——而是真正理解你业务的、会说话的、主动建议下一步行动的企业操作系统。</span>
+      <span data-lang-content="en">An AI-driven business brain built for Philippine & SEA SMEs. Not another ERP — but an operating system that truly understands your business, listens to you, and proactively suggests what to do next.</span>
+    </p>
+    <div class="hero-buttons">
+      <a href="#magic" class="btn btn-primary">
+        <span data-lang-content="zh">看三个魔法时刻</span>
+        <span data-lang-content="en">See the magic</span>
+        <span class="arrow">→</span>
+      </a>
+      <a href="#contact" class="btn btn-secondary">
+        <span data-lang-content="zh">预约演示</span>
+        <span data-lang-content="en">Book a demo</span>
+      </a>
+    </div>
+
+    <div class="hero-meta-grid">
+      <div class="hero-meta-item">
+        <div class="label"><span data-lang-content="zh">为谁打造</span><span data-lang-content="en">Built For</span></div>
+        <div class="value"><span data-lang-content="zh">菲律宾<em>+SEA</em></span><span data-lang-content="en">PH<em>+SEA</em></span></div>
+      </div>
+      <div class="hero-meta-item">
+        <div class="label"><span data-lang-content="zh">技术驱动</span><span data-lang-content="en">Powered By</span></div>
+        <div class="value">Claude<em>+GPT</em></div>
+      </div>
+      <div class="hero-meta-item">
+        <div class="label"><span data-lang-content="zh">模块数量</span><span data-lang-content="en">Modules</span></div>
+        <div class="value">15<em><span data-lang-content="zh">个</span><span data-lang-content="en">+</span></em></div>
+      </div>
+      <div class="hero-meta-item">
+        <div class="label"><span data-lang-content="zh">上线时间</span><span data-lang-content="en">Status</span></div>
+        <div class="value"><em><span data-lang-content="zh">2025上线</span><span data-lang-content="en">Q4 2025</span></em></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="scroll-indicator">
+    <span data-lang-content="zh">向下滚动</span>
+    <span data-lang-content="en">Scroll</span>
+  </div>
+</section>
+
+<!-- PROBLEM -->
+<section id="problem">
+  <div class="container">
+    <div class="section-head reveal">
+      <div>
+        <div class="eyebrow">01 · <span data-lang-content="zh">问题</span><span data-lang-content="en">The Problem</span></div>
+        <h2 class="display">
+          <span data-lang-content="zh">菲律宾老板<br>每天都在解决<br><em>同一个</em>问题。</span>
+          <span data-lang-content="en">Every PH<br>founder solves<br>the <em>same</em> problem.</span>
+        </h2>
+      </div>
+      <p class="intro">
+        <span data-lang-content="zh">不是没有钱。不是没有客户。是每天14小时工作里，<strong>80%的时间</strong>在做电脑能做的事——填表、对账、跑政府部门、找数据。</span>
+        <span data-lang-content="en">It's not money. It's not customers. It's that <strong>80% of your 14-hour workday</strong> is spent doing what a computer should do — filing forms, reconciling accounts, running between government offices, hunting for data.</span>
+      </p>
+    </div>
+
+    <div class="editorial-quote reveal">
+      <p class="text">
+        <span data-lang-content="zh">"我请了一个会计、一个仓管、一个销售助理。每月花₱60K工资。他们大部分时间在做什么？<em>填表格。</em>"</p>
+        <span data-lang-content="en">"I hired an accountant, a warehouse manager, a sales assistant. I pay them ₱60K a month. You know what they actually do most of the day? <em>Fill out forms.</em>"</span>
+      </p>
+      <p class="attr">
+        <span data-lang-content="zh">— 一位真实菲律宾SME老板</span>
+        <span data-lang-content="en">— A real Philippine SME owner</span>
+      </p>
+    </div>
+
+    <div class="stats-row reveal-stagger">
+      <div class="stat">
+        <div class="num display-italic"><span class="counter" data-target="200">0</span><small>+</small></div>
+        <div class="label">
+          <span data-lang-content="zh">每年处理政府事务的小时数</span>
+          <span data-lang-content="en">Hours/year on government paperwork</span>
+        </div>
+      </div>
+      <div class="stat">
+        <div class="num display-italic"><span class="counter" data-target="15">0</span><small data-lang-content="zh">天</small><small data-lang-content="en">d</small></div>
+        <div class="label">
+          <span data-lang-content="zh">每月财务结账时间</span>
+          <span data-lang-content="en">Days to close monthly books</span>
+        </div>
+      </div>
+      <div class="stat">
+        <div class="num display-italic">₱<span class="counter" data-target="200">0</span>K</div>
+        <div class="label">
+          <span data-lang-content="zh">每年合规与办证开销</span>
+          <span data-lang-content="en">Yearly compliance & permits cost</span>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="display reveal" style="font-style:italic; font-weight:400; font-size: clamp(36px, 5vw, 64px); margin-top: 120px; margin-bottom: 24px; letter-spacing:-0.025em; line-height:1;">
+      <span data-lang-content="zh">一个真实菲律宾CEO的一天</span>
+      <span data-lang-content="en">A real day in a PH CEO's life</span>
+    </h3>
+    <p style="color:var(--text-dim); margin-bottom: 40px; font-size: 17px;" class="reveal">
+      <span data-lang-content="zh">14个小时，11小时在做电脑能替你做的事</span>
+      <span data-lang-content="en">14 hours of work — 11 of them doing what a computer could do</span>
+    </p>
+
+    <div class="timeline reveal-stagger">
+      <div class="timeline-item">
+        <div class="timeline-time">08:00 AM</div>
+        <div class="icon-cell"><span class="timeline-icon">🌅</span></div>
+        <div class="timeline-text">
+          <span data-lang-content="zh">到办公室，翻昨天的销售记录，手工抄进Excel</span>
+          <span data-lang-content="en">Arrive at office, manually copy yesterday's sales into Excel</span>
+        </div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-time">10:00 AM</div>
+        <div class="icon-cell"><span class="timeline-icon">🏛️</span></div>
+        <div class="timeline-text">
+          <span data-lang-content="zh">跑Quezon City Hall续Mayor's Permit，排队3小时</span>
+          <span data-lang-content="en">Drive to Quezon City Hall for Mayor's Permit renewal, queue for 3 hours</span>
+        </div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-time">01:00 PM</div>
+        <div class="icon-cell"><span class="timeline-icon">☎️</span></div>
+        <div class="timeline-text">
+          <span data-lang-content="zh">和供应商电话谈价格，挂电话后忘记记什么</span>
+          <span data-lang-content="en">Phone call with supplier about pricing — forget what was agreed after hanging up</span>
+        </div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-time">04:00 PM</div>
+        <div class="icon-cell"><span class="timeline-icon">📊</span></div>
+        <div class="timeline-text">
+          <span data-lang-content="zh">财务说月报又延期了，因为银行流水还没对完</span>
+          <span data-lang-content="en">Accountant says monthly report is delayed again — bank reconciliation still pending</span>
+        </div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-time">09:00 PM</div>
+        <div class="icon-cell"><span class="timeline-icon">📧</span></div>
+        <div class="timeline-text">
+          <span data-lang-content="zh">员工发WhatsApp说Maria又迟到，不知道怎么处理</span>
+          <span data-lang-content="en">Staff WhatsApps that Maria is late again — no clue how to handle this legally</span>
+        </div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-time">11:00 PM</div>
+        <div class="icon-cell"><span class="timeline-icon">🌙</span></div>
+        <div class="timeline-text">
+          <span data-lang-content="zh">盯着Excel发呆，不知道哪个业务真在赚钱</span>
+          <span data-lang-content="en">Stare at Excel — still no idea which business line is actually making money</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- VISION -->
+<section id="vision">
+  <div class="container">
+    <div class="section-head reveal">
+      <div>
+        <div class="eyebrow">02 · <span data-lang-content="zh">我们的答案</span><span data-lang-content="en">Our Answer</span></div>
+        <h2 class="display">
+          <span data-lang-content="zh">不是<span class="light">工具，</span><br>是<em>大脑</em>。</span>
+          <span data-lang-content="en"><span class="light">Not</span> a tool.<br>A <em>brain</em>.</span>
+        </h2>
+      </div>
+      <p class="intro">
+        <span data-lang-content="zh">Quill是为东南亚SME打造的AI驱动企业大脑。<br><br>系统观察工作发生 → 自动产出洞察 → 主动建议行动。<br><br>老板只需要做<strong>决策</strong>。</span>
+        <span data-lang-content="en">Quill is the AI-driven business brain for SEA SMEs.<br><br>The system observes work happening → generates insights → suggests next actions.<br><br>You just <strong>decide</strong>.</span>
+      </p>
+    </div>
+
+    <div class="editorial-quote reveal">
+      <p class="text">
+        <span data-lang-content="zh">ERP是公司的会计本——记录已发生的事。<br><em>Company OS</em>是公司的大脑——观察正在发生的，预测即将发生的，主动建议<em>下一步</em>。</span>
+        <span data-lang-content="en">ERP is your company's ledger — recording what already happened.<br><em>Company OS</em> is your company's brain — watching what's happening, predicting what's next, suggesting <em>the next move</em>.</span>
+      </p>
+    </div>
+
+    <h3 class="display reveal" style="font-weight:300; font-size: clamp(36px, 5vw, 56px); margin: 120px 0 16px; letter-spacing:-0.025em; line-height:1;">
+      <span data-lang-content="zh">六大设计原则</span>
+      <span data-lang-content="en">Six design principles</span>
+    </h3>
+    <p style="color:var(--text-dim); margin-bottom: 60px; font-size: 17px;" class="reveal">
+      <span data-lang-content="zh">每一条都源于真实经营的痛</span>
+      <span data-lang-content="en">Each one born from real operating pain</span>
+    </p>
+
+    <div class="principles reveal-stagger">
+      <div class="principle">
+        <div class="principle-num"><span data-lang-content="zh">原则 01</span><span data-lang-content="en">Principle 01</span></div>
+        <h3><em>AI-First</em></h3>
+        <p>
+          <span data-lang-content="zh">每个模块默认带AI，不是"可选附加"。AI是这个系统的神经，不是装饰。</span>
+          <span data-lang-content="en">Every module ships with AI by default — not as an "optional add-on." AI is the nervous system, not the decoration.</span>
+        </p>
+      </div>
+      <div class="principle">
+        <div class="principle-num"><span data-lang-content="zh">原则 02</span><span data-lang-content="en">Principle 02</span></div>
+        <h3>Observe,<br><em>Don't Type</em></h3>
+        <p>
+          <span data-lang-content="zh">系统主动从邮件、电话、IM、扫码中获取数据。零摩擦录入。</span>
+          <span data-lang-content="en">The system pulls data from emails, calls, IMs, scans. Zero-friction capture.</span>
+        </p>
+      </div>
+      <div class="principle">
+        <div class="principle-num"><span data-lang-content="zh">原则 03</span><span data-lang-content="en">Principle 03</span></div>
+        <h3>Suggest,<br><em>Don't Just Log</em></h3>
+        <p>
+          <span data-lang-content="zh">每条数据都触发"下一步建议"。AI是放大器不是替代者。</span>
+          <span data-lang-content="en">Every data point triggers a "next step." AI is an amplifier, not a replacement.</span>
+        </p>
+      </div>
+      <div class="principle">
+        <div class="principle-num"><span data-lang-content="zh">原则 04</span><span data-lang-content="en">Principle 04</span></div>
+        <h3><em>Voice-First</em></h3>
+        <p>
+          <span data-lang-content="zh">长按按钮说一段话，AI自动完成80%的常规操作。键盘是给员工用的，说话是给老板用的。</span>
+          <span data-lang-content="en">Hold the button, say a sentence, AI handles 80% of routine ops. Keyboards are for employees. Voice is for owners.</span>
+        </p>
+      </div>
+      <div class="principle">
+        <div class="principle-num"><span data-lang-content="zh">原则 05</span><span data-lang-content="en">Principle 05</span></div>
+        <h3><em>Hyperlocal</em></h3>
+        <p>
+          <span data-lang-content="zh">深度菲律宾化：BIR、SSS、Mayor's Permit、Padrino文化、Holy Week——国际产品永远做不到的层次。</span>
+          <span data-lang-content="en">Deep Philippines: BIR, SSS, Mayor's Permit, Padrino culture, Holy Week — depth international products will never match.</span>
+        </p>
+      </div>
+      <div class="principle">
+        <div class="principle-num"><span data-lang-content="zh">原则 06</span><span data-lang-content="en">Principle 06</span></div>
+        <h3>Human<br><em>in the Loop</em></h3>
+        <p>
+          <span data-lang-content="zh">关键决策仍由人批准。AI建议，人决定。这是信任的底线。</span>
+          <span data-lang-content="en">Critical decisions still need human approval. AI suggests, humans decide. That's the bottom line of trust.</span>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MAGIC -->
+<section id="magic">
+  <div class="container">
+    <div class="section-head reveal">
+      <div>
+        <div class="eyebrow">03 · <span data-lang-content="zh">杀手锏</span><span data-lang-content="en">Killer Features</span></div>
+        <h2 class="display">
+          <span data-lang-content="zh">三个<br><em>魔法时刻</em>。</span>
+          <span data-lang-content="en">Three <em>magic</em><br>moments.</span>
+        </h2>
+      </div>
+      <p class="intro">
+        <span data-lang-content="zh">Quill的差异化，不在功能列表，而在三个让用户"哇"的瞬间。这是其他任何ERP都给不了你的体验。</span>
+        <span data-lang-content="en">Our difference isn't in feature lists. It's in three "wow" moments no other ERP delivers.</span>
+      </p>
+    </div>
+
+    <div class="moments">
+      <!-- Moment 1 -->
+      <div class="moment reveal">
+        <div class="moment-header">
+          <div class="moment-number display">01</div>
+          <div class="moment-title-block">
+            <h3 class="display">
+              <span data-lang-content="zh">30秒完成<br><em>销售跟进</em>。</span>
+              <span data-lang-content="en">Sales follow-up<br>in <em>30 seconds</em>.</span>
+            </h3>
+            <p>
+              <span data-lang-content="zh">销售员见完客户，掏出手机，长按🎙说30秒。CRM全部填好，跟进邮件草稿已准备好，AI已在日历预定提醒。</span>
+              <span data-lang-content="en">Salesperson finishes a meeting, holds 🎙 for 30 seconds. CRM fully updated, follow-up email drafted, AI calendar reminder set.</span>
+            </p>
+          </div>
+        </div>
+        <div class="compare">
+          <div class="compare-card">
+            <div class="compare-label"><span data-lang-content="zh">传统 CRM</span><span data-lang-content="en">Traditional CRM</span></div>
+            <ul class="compare-list">
+              <li><span data-lang-content="zh">回办公室填CRM，10分钟</span><span data-lang-content="en">Drive back, log into CRM, 10 minutes</span></li>
+              <li><span data-lang-content="zh">凭记忆，错误率50%</span><span data-lang-content="en">From memory — 50% error rate</span></li>
+              <li><span data-lang-content="zh">跟进策略靠老板自己想</span><span data-lang-content="en">Follow-up strategy on your own</span></li>
+              <li><span data-lang-content="zh">一个月后客户被遗忘</span><span data-lang-content="en">Client forgotten in a month</span></li>
+              <li><span data-lang-content="zh">销售机会丢失</span><span data-lang-content="en">Opportunity lost</span></li>
+            </ul>
+          </div>
+          <div class="compare-card after">
+            <div class="compare-label">Quill</div>
+            <ul class="compare-list">
+              <li><span data-lang-content="zh">在车里按🎙说30秒</span><span data-lang-content="en">Hold 🎙 in the car for 30s</span></li>
+              <li><span data-lang-content="zh">AI实时记录，错误<5%</span><span data-lang-content="en">AI captures in real-time, <5% errors</span></li>
+              <li><span data-lang-content="zh">AI主动建议"3天后发X案例"</span><span data-lang-content="en">AI suggests "send case study in 3 days"</span></li>
+              <li><span data-lang-content="zh">AI日历提醒，永不遗忘</span><span data-lang-content="en">AI calendar reminder, never forgotten</span></li>
+              <li><span data-lang-content="zh">转化率提升15-25%</span><span data-lang-content="en">Conversion +15-25%</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Moment 2 -->
+      <div class="moment reveal">
+        <div class="moment-header">
+          <div class="moment-number display">02</div>
+          <div class="moment-title-block">
+            <h3 class="display">
+              <span data-lang-content="zh">两周<br><em>变两小时</em>。</span>
+              <span data-lang-content="en">Two weeks<br>→ <em>two hours</em>.</span>
+            </h3>
+            <p>
+              <span data-lang-content="zh">Mayor's Permit续签是菲律宾老板每年1月的噩梦。Quill Permit · M13：拍一张政府表格照片，AI自动从公司数据库填好所有字段，生成可打印PDF。</span>
+              <span data-lang-content="en">Mayor's Permit renewal is every PH owner's January nightmare. M13 Quill Permit: snap a photo of any government form, AI auto-fills every field from your company database, outputs a print-ready PDF.</span>
+            </p>
+          </div>
+        </div>
+        <div class="compare">
+          <div class="compare-card">
+            <div class="compare-label"><span data-lang-content="zh">手工办证</span><span data-lang-content="en">Manual permits</span></div>
+            <ul class="compare-list">
+              <li><span data-lang-content="zh">手工填15份表，4小时</span><span data-lang-content="en">Fill 15 forms by hand, 4 hours</span></li>
+              <li><span data-lang-content="zh">跑7个部门，2周</span><span data-lang-content="en">7 government offices, 2 weeks</span></li>
+              <li><span data-lang-content="zh">手工记台账，经常错过续期</span><span data-lang-content="en">Manual tracking, frequent expirations</span></li>
+              <li><span data-lang-content="zh">请中介，₱100K+</span><span data-lang-content="en">Pay middlemen, ₱100K+</span></li>
+              <li><span data-lang-content="zh">错填被打回，往返3天</span><span data-lang-content="en">Errors → bounced back, +3 days</span></li>
+            </ul>
+          </div>
+          <div class="compare-card after">
+            <div class="compare-label">Quill · M13</div>
+            <ul class="compare-list">
+              <li><span data-lang-content="zh">拍照→AI识别→自动填字段</span><span data-lang-content="en">Photo → AI recognizes → auto-fills</span></li>
+              <li><span data-lang-content="zh">在线提交+智能预约</span><span data-lang-content="en">Online submission + smart appointments</span></li>
+              <li><span data-lang-content="zh">自动提醒90/30/14/7天</span><span data-lang-content="en">Auto reminders 90/30/14/7 days</span></li>
+              <li><span data-lang-content="zh">AI辅导，₱30K一次性</span><span data-lang-content="en">AI guidance, ₱30K one-time</span></li>
+              <li><span data-lang-content="zh">错字段提前预警</span><span data-lang-content="en">Field errors caught before submission</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Moment 3 -->
+      <div class="moment reveal">
+        <div class="moment-header">
+          <div class="moment-number display">03</div>
+          <div class="moment-title-block">
+            <h3 class="display">
+              <span data-lang-content="zh"><em>零日</em><br>结账。</span>
+              <span data-lang-content="en"><em>Zero-day</em><br>close.</span>
+            </h3>
+            <p>
+              <span data-lang-content="zh">传统财务每月底加班2-3天对账。Company OS让账本持续更新——次月第1天就有月报，CEO每天早上7点收到自动简报。</span>
+              <span data-lang-content="en">Traditional finance teams work 2-3 extra days at month-end. Company OS keeps the books continuously updated — monthly reports on day 1, CEO briefing at 7am daily.</span>
+            </p>
+          </div>
+        </div>
+        <div class="compare">
+          <div class="compare-card">
+            <div class="compare-label"><span data-lang-content="zh">传统财务</span><span data-lang-content="en">Traditional finance</span></div>
+            <ul class="compare-list">
+              <li><span data-lang-content="zh">银行对账人工逐笔，2-3天</span><span data-lang-content="en">Manual bank reconciliation, 2-3 days</span></li>
+              <li><span data-lang-content="zh">凭证人工每笔录入</span><span data-lang-content="en">Vouchers manually entered, one by one</span></li>
+              <li><span data-lang-content="zh">月报次月第10-15天</span><span data-lang-content="en">Monthly report on day 10-15</span></li>
+              <li><span data-lang-content="zh">VAT申报准备3-5天</span><span data-lang-content="en">VAT prep takes 3-5 days</span></li>
+              <li><span data-lang-content="zh">异常发现靠财务自己看</span><span data-lang-content="en">Anomalies caught only if accountant looks</span></li>
+            </ul>
+          </div>
+          <div class="compare-card after">
+            <div class="compare-label">Quill · M4</div>
+            <ul class="compare-list">
+              <li><span data-lang-content="zh">AI自动98%匹配，2%人工复核</span><span data-lang-content="en">AI auto-matches 98%, humans review 2%</span></li>
+              <li><span data-lang-content="zh">AI基于历史规则自动归类</span><span data-lang-content="en">AI auto-classifies from learned rules</span></li>
+              <li><span data-lang-content="zh">月报次月第1天</span><span data-lang-content="en">Monthly report on day 1</span></li>
+              <li><span data-lang-content="zh">BIR申报准备<2小时</span><span data-lang-content="en">BIR prep in <2 hours</span></li>
+              <li><span data-lang-content="zh">AI主动预警"X供应商支出超均值3倍"</span><span data-lang-content="en">AI proactively flags "X supplier spend 3x average"</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MODULES -->
+<section id="modules">
+  <div class="container">
+    <div class="section-head reveal">
+      <div>
+        <div class="eyebrow">04 · <span data-lang-content="zh">完整图谱</span><span data-lang-content="en">Full Map</span></div>
+        <h2 class="display">
+          <span data-lang-content="zh">15个模块。<br>一个<em>大脑</em>。</span>
+          <span data-lang-content="en">15 modules.<br>One <em>brain</em>.</span>
+        </h2>
+      </div>
+      <p class="intro">
+        <span data-lang-content="zh">M0基础层 + 14个业务模块，按优先级分阶段上线。每个模块都有专属Agent家族（多个AI专家协同），不是单一聊天机器人。</span>
+        <span data-lang-content="en">M0 foundation + 14 business modules, rolled out in phases. Each module has its own AI Agent family — not a single chatbot.</span>
+      </p>
+    </div>
+
+    <div class="modules-table reveal-stagger">
+      <div class="module-row"><div class="module-id">M0</div><div class="module-name"><span data-lang-content="zh">基础层</span><span data-lang-content="en">Foundation</span></div><div class="module-desc desc-col"><span data-lang-content="zh">Agent Runtime · 向量库 · Voice网关</span><span data-lang-content="en">Agent Runtime · Vector DB · Voice gateway</span></div><div class="module-phase">Phase 1</div></div>
+      <div class="module-row"><div class="module-id">M1</div><div class="module-name"><span data-lang-content="zh">智能库存</span><span data-lang-content="en">Smart Inventory</span></div><div class="module-desc desc-col"><span data-lang-content="zh">需求预测 · 智能补货 · 扫码识别</span><span data-lang-content="en">Demand forecast · Smart restock · Scan</span></div><div class="module-phase">Phase 1</div></div>
+      <div class="module-row"><div class="module-id">M2</div><div class="module-name"><span data-lang-content="zh">智能 POS</span><span data-lang-content="en">Smart POS</span></div><div class="module-desc desc-col"><span data-lang-content="zh">收银 · 智能推荐 · 欺诈检测</span><span data-lang-content="en">Checkout · Recommendation · Fraud</span></div><div class="module-phase">Phase 1</div></div>
+      <div class="module-row"><div class="module-id">M3</div><div class="module-name"><span data-lang-content="zh">智能采购</span><span data-lang-content="en">Smart Procurement</span></div><div class="module-desc desc-col"><span data-lang-content="zh">供应商对比 · PO自动生成</span><span data-lang-content="en">Supplier compare · Auto PO</span></div><div class="module-phase">Phase 2</div></div>
+      <div class="module-row"><div class="module-id">M4</div><div class="module-name"><span data-lang-content="zh">智能<em>财务</em>（零日结账）</span><span data-lang-content="en">Smart <em>Finance</em> (Zero-Day Close)</span></div><div class="module-desc desc-col"><span data-lang-content="zh">银行对账AI · 收据OCR · BIR申报</span><span data-lang-content="en">Bank recon AI · Receipt OCR · BIR</span></div><div class="module-phase">Phase 1+2</div></div>
+      <div class="module-row"><div class="module-id star">M5 ★</div><div class="module-name"><span class="star">★</span><span data-lang-content="zh">智能 <em>CRM</em></span><span data-lang-content="en">Smart <em>CRM</em></span></div><div class="module-desc desc-col"><span data-lang-content="zh">通话转录 · 情绪分析 · 跟进建议</span><span data-lang-content="en">Call transcription · Sentiment · Follow-up</span></div><div class="module-phase">Phase 1</div></div>
+      <div class="module-row"><div class="module-id">M6</div><div class="module-name"><span data-lang-content="zh">智能 HR</span><span data-lang-content="en">Smart HR</span></div><div class="module-desc desc-col"><span data-lang-content="zh">考勤 · 薪资 · 智能排班 · 简历筛选</span><span data-lang-content="en">Attendance · Payroll · Scheduling · CV</span></div><div class="module-phase">Phase 2</div></div>
+      <div class="module-row"><div class="module-id">M7</div><div class="module-name"><span data-lang-content="zh">酒店 PMS</span><span data-lang-content="en">Hotel PMS</span></div><div class="module-desc desc-col"><span data-lang-content="zh">房态 · 动态定价 · 客评分析</span><span data-lang-content="en">Rooms · Dynamic pricing · Review AI</span></div><div class="module-phase">Phase 3</div></div>
+      <div class="module-row"><div class="module-id">M8</div><div class="module-name"><span data-lang-content="zh">对话式 BI</span><span data-lang-content="en">Conversational BI</span></div><div class="module-desc desc-col"><span data-lang-content="zh">自然语言查询 · 主动洞察 · CEO日报</span><span data-lang-content="en">NL queries · Insights · CEO briefing</span></div><div class="module-phase">Phase 1+2</div></div>
+      <div class="module-row"><div class="module-id">M9</div><div class="module-name"><span data-lang-content="zh">通讯集成层</span><span data-lang-content="en">Comms Hub</span></div><div class="module-desc desc-col"><span data-lang-content="zh">电话 / Email / WhatsApp / 微信</span><span data-lang-content="en">Phone / Email / WhatsApp / WeChat</span></div><div class="module-phase">Phase 1</div></div>
+      <div class="module-row"><div class="module-id star">M10 ★</div><div class="module-name"><span class="star">★</span><span data-lang-content="zh"><em>会议</em>智能</span><span data-lang-content="en"><em>Meeting</em> Intelligence</span></div><div class="module-desc desc-col"><span data-lang-content="zh">录音→纪要→行动项→跨模块联动</span><span data-lang-content="en">Record → minutes → actions → flows</span></div><div class="module-phase">Phase 1</div></div>
+      <div class="module-row"><div class="module-id star">M11 ★</div><div class="module-name"><span class="star">★</span><span data-lang-content="zh"><em>语音</em>输入</span><span data-lang-content="en"><em>Voice</em> Input</span></div><div class="module-desc desc-col"><span data-lang-content="zh">🎙长按说话完成80%操作</span><span data-lang-content="en">🎙 Hold-to-talk: 80% of ops</span></div><div class="module-phase">Phase 1</div></div>
+      <div class="module-row"><div class="module-id">M12</div><div class="module-name"><span data-lang-content="zh">AI <em>法律</em>顾问</span><span data-lang-content="en">AI <em>Legal</em> Advisor</span></div><div class="module-desc desc-col"><span data-lang-content="zh">菲律宾法律百科 · 合同审阅</span><span data-lang-content="en">PH law base · Contract review</span></div><div class="module-phase">Phase 2</div></div>
+      <div class="module-row"><div class="module-id star">M13 ★</div><div class="module-name"><span class="star">★</span><span data-lang-content="zh">AI <em>办证</em>顾问</span><span data-lang-content="en">AI <em>Permit</em> Advisor</span></div><div class="module-desc desc-col"><span data-lang-content="zh">拍照调表 · 续期提醒 · 流程跟踪</span><span data-lang-content="en">Photo-to-form · Renewal · Tracking</span></div><div class="module-phase">Phase 1.5</div></div>
+      <div class="module-row"><div class="module-id">M14</div><div class="module-name"><span data-lang-content="zh">AI <em>企业</em>顾问</span><span data-lang-content="en">AI <em>Business</em> Advisor</span></div><div class="module-desc desc-col"><span data-lang-content="zh">战略诊断 · 行业对标 · 决策模拟</span><span data-lang-content="en">Strategy · Benchmark · Simulation</span></div><div class="module-phase">Phase 3</div></div>
+    </div>
+    <p style="margin-top:32px; font-family:var(--mono); font-size:12px; color:var(--text-muted); letter-spacing:0.1em;">
+      <span style="color:var(--highlight);">★</span>
+      <span data-lang-content="zh">杀手级模块，差异化核心</span>
+      <span data-lang-content="en">Killer modules — our core differentiation</span>
+    </p>
+  </div>
+</section>
+
+<!-- WHY US / NOW -->
+<section>
+  <div class="container">
+    <div class="section-head reveal">
+      <div>
+        <div class="eyebrow">05 · <span data-lang-content="zh">时机</span><span data-lang-content="en">Timing</span></div>
+        <h2 class="display">
+          <span data-lang-content="zh">为什么<em>是我们</em>，<br>为什么<em>是现在</em>。</span>
+          <span data-lang-content="en">Why <em>us</em>,<br>why <em>now</em>.</span>
+        </h2>
+      </div>
+      <p class="intro">
+        <span data-lang-content="zh">这不是又一家硅谷公司"研究"东南亚。我们就在东南亚做生意，已经35年了。</span>
+        <span data-lang-content="en">This isn't another Silicon Valley company "researching" SEA. We've been running businesses here for 35 years.</span>
+      </p>
+    </div>
+
+    <div class="why-section reveal">
+      <div class="why-block">
+        <h3 class="display">Why us.</h3>
+        <div class="why-item">
+          <h4><span data-lang-content="zh">35年菲律宾本地经验</span><span data-lang-content="en">35 years on the ground in PH</span></h4>
+          <p>
+            <span data-lang-content="zh">创始人家族经营250间客房酒店、PPF/汽车贴膜、建材批发、咖啡厅。我们就在东南亚做生意。</span>
+            <span data-lang-content="en">Founder's family runs a 250-room hotel, PPF/auto-tinting, building materials wholesale, café. We're operators.</span>
+          </p>
+        </div>
+        <div class="why-item">
+          <h4><span data-lang-content="zh">跨文化深度</span><span data-lang-content="en">Bi-cultural depth</span></h4>
+          <p>
+            <span data-lang-content="zh">中国出生，9岁移居菲律宾，上海交大国际贸易毕业。中、英、Filipino、Taglish自如切换。</span>
+            <span data-lang-content="en">Born in China, moved to PH at 9, SJTU Intl Trade alum. Fluent in CN/EN/Filipino/Taglish.</span>
+          </p>
+        </div>
+        <div class="why-item">
+          <h4><span data-lang-content="zh">6个开源仓库基础</span><span data-lang-content="en">6 working code bases</span></h4>
+          <p>
+            <span data-lang-content="zh">POS、库存、CRM、会员、汽车经销商、建材IMS——已在真实业务中验证过的代码。</span>
+            <span data-lang-content="en">POS, inventory, CRM, membership, car dealer, building materials IMS — all battle-tested.</span>
+          </p>
+        </div>
+        <div class="why-item">
+          <h4><span data-lang-content="zh">第一性原理 + AI技术深度</span><span data-lang-content="en">First-principles + deep AI</span></h4>
+          <p>
+            <span data-lang-content="zh">深度使用Claude Code、ComfyUI、量化交易策略、AI自定义技术指标。</span>
+            <span data-lang-content="en">Heavy hands-on with Claude Code, ComfyUI, quant trading, custom AI indicators.</span>
+          </p>
+        </div>
+      </div>
+
+      <div class="why-block">
+        <h3 class="display">Why now.</h3>
+        <div class="why-item">
+          <h4><span data-lang-content="zh">技术拐点</span><span data-lang-content="en">Tech inflection</span></h4>
+          <p>
+            <span data-lang-content="zh">Claude 4.5 / GPT-4o让Agent家族实用化。Whisper让语音转录便宜+准确。RAG架构已稳定。</span>
+            <span data-lang-content="en">Claude 4.5 / GPT-4o make Agent families viable. Whisper makes voice cheap & accurate. RAG is mature.</span>
+          </p>
+        </div>
+        <div class="why-item">
+          <h4><span data-lang-content="zh">市场拐点</span><span data-lang-content="en">Market inflection</span></h4>
+          <p>
+            <span data-lang-content="zh">菲律宾SME数字化渗透率<15%。GCash/Maya支付基建已成熟。BIR开始推e-Invoice合规。</span>
+            <span data-lang-content="en">PH SME digitization <15%. GCash/Maya rails are live. BIR pushing e-Invoice compliance.</span>
+          </p>
+        </div>
+        <div class="why-item">
+          <h4><span data-lang-content="zh">文化拐点</span><span data-lang-content="en">Cultural inflection</span></h4>
+          <p>
+            <span data-lang-content="zh">年轻一代菲律宾老板（Gen X/Y）愿意接受新工具。COVID后远程协作接受度提升。</span>
+            <span data-lang-content="en">Gen X/Y PH owners embrace new tools. Post-COVID remote work is mainstream.</span>
+          </p>
+        </div>
+        <div class="why-item">
+          <h4><span data-lang-content="zh">竞品验证</span><span data-lang-content="en">Market validation</span></h4>
+          <p>
+            <span data-lang-content="zh">Campfire $100M+、Rillet $108M+、Nory $63M——AI-Native ERP已证明可10x优于传统。</span>
+            <span data-lang-content="en">Campfire $100M+, Rillet $108M+, Nory $63M — AI-Native ERPs proven to be 10x.</span>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+  <div class="container">
+    <div class="section-head reveal">
+      <div>
+        <div class="eyebrow">06 · <span data-lang-content="zh">定价</span><span data-lang-content="en">Pricing</span></div>
+        <h2 class="display">
+          <span data-lang-content="zh">不按<em>用户数</em>。<br>按你<em>用了什么</em>。</span>
+          <span data-lang-content="en">Not per <em>seat</em>.<br>Per <em>what you use</em>.</span>
+        </h2>
+      </div>
+      <p class="intro">
+        <span data-lang-content="zh">我们的定价哲学：不像传统ERP按席位收费。你买什么模块就付什么钱，没有用到的功能不会让你买单。</span>
+        <span data-lang-content="en">Our philosophy: unlike legacy ERPs that charge per seat, you pay only for the modules you use. Nothing more.</span>
+      </p>
+    </div>
+
+    <div class="pricing reveal-stagger">
+      <div class="price">
+        <div class="price-name">Starter</div>
+        <div class="price-amount">₱4K<span class="light">–8K</span></div>
+        <div class="price-unit"><span data-lang-content="zh">每月 / PHP</span><span data-lang-content="en">/month · PHP</span></div>
+        <p class="price-desc"><span data-lang-content="zh">已有QuickBooks，只想加1-2个智能模块</span><span data-lang-content="en">Already on QuickBooks, just want 1-2 smart modules</span></p>
+        <ul class="price-list">
+          <li>M1 OR M5 OR M13</li>
+          <li><span data-lang-content="zh">Voice输入基础版</span><span data-lang-content="en">Basic Voice Input</span></li>
+          <li><span data-lang-content="zh">邮件支持</span><span data-lang-content="en">Email support</span></li>
+        </ul>
+      </div>
+
+      <div class="price featured" data-badge="POPULAR">
+        <div class="price-name">Growth</div>
+        <div class="price-amount">₱15K<span class="light">–25K</span></div>
+        <div class="price-unit"><span data-lang-content="zh">每月 / PHP</span><span data-lang-content="en">/month · PHP</span></div>
+        <p class="price-desc"><span data-lang-content="zh">中小企业核心套餐</span><span data-lang-content="en">Core SME package</span></p>
+        <ul class="price-list">
+          <li>M1+M2+M4+M5+M8+M13</li>
+          <li><span data-lang-content="zh">完整Voice-First</span><span data-lang-content="en">Full Voice-First</span></li>
+          <li><span data-lang-content="zh">会议智能</span><span data-lang-content="en">Meeting Intelligence</span></li>
+          <li><span data-lang-content="zh">对话式BI</span><span data-lang-content="en">Conversational BI</span></li>
+          <li><span data-lang-content="zh">WhatsApp支持</span><span data-lang-content="en">WhatsApp support</span></li>
+        </ul>
+      </div>
+
+      <div class="price">
+        <div class="price-name">Scale</div>
+        <div class="price-amount">₱30K<span class="light">–60K</span></div>
+        <div class="price-unit"><span data-lang-content="zh">每月 / PHP</span><span data-lang-content="en">/month · PHP</span></div>
+        <p class="price-desc"><span data-lang-content="zh">多门店 / 多业态</span><span data-lang-content="en">Multi-store / multi-business</span></p>
+        <ul class="price-list">
+          <li><span data-lang-content="zh">Growth全部</span><span data-lang-content="en">All of Growth</span></li>
+          <li><span data-lang-content="zh">+ M7 酒店 OR</span><span data-lang-content="en">+ M7 Hotel OR</span></li>
+          <li><span data-lang-content="zh">+ M12 法律顾问</span><span data-lang-content="en">+ M12 Legal Advisor</span></li>
+          <li><span data-lang-content="zh">多店数据合并</span><span data-lang-content="en">Multi-store data merge</span></li>
+          <li><span data-lang-content="zh">专属客户经理</span><span data-lang-content="en">Dedicated CSM</span></li>
+        </ul>
+      </div>
+
+      <div class="price">
+        <div class="price-name">Enterprise</div>
+        <div class="price-amount">₱80K<span class="light">+</span></div>
+        <div class="price-unit"><span data-lang-content="zh">每月 / PHP</span><span data-lang-content="en">/month · PHP</span></div>
+        <p class="price-desc"><span data-lang-content="zh">大客户定制方案</span><span data-lang-content="en">Enterprise custom</span></p>
+        <ul class="price-list">
+          <li><span data-lang-content="zh">全部模块</span><span data-lang-content="en">All modules</span></li>
+          <li>+ M14 <span data-lang-content="zh">企业顾问</span><span data-lang-content="en">Business Advisor</span></li>
+          <li><span data-lang-content="zh">自定义Agent</span><span data-lang-content="en">Custom Agents</span></li>
+          <li><span data-lang-content="zh">私有部署可选</span><span data-lang-content="en">Private deployment</span></li>
+          <li><span data-lang-content="zh">7×24支持</span><span data-lang-content="en">24/7 support</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="roi reveal">
+      <h3 class="roi-title">
+        <span data-lang-content="zh">投资回报示例</span>
+        <span data-lang-content="en">ROI Example</span>
+      </h3>
+      <p class="roi-sub">
+        <span data-lang-content="zh">中等连锁咖啡厅 · 5家店 · 使用 Growth 套餐</span>
+        <span data-lang-content="en">Mid-sized café chain · 5 stores · Growth plan</span>
+      </p>
+      <table class="roi-table">
+        <tr>
+          <th><span data-lang-content="zh">项目</span><span data-lang-content="en">Item</span></th>
+          <th><span data-lang-content="zh">使用前</span><span data-lang-content="en">Before</span></th>
+          <th><span data-lang-content="zh">使用后</span><span data-lang-content="en">After</span></th>
+          <th style="text-align:right;"><span data-lang-content="zh">月度节省</span><span data-lang-content="en">Monthly Saving</span></th>
+        </tr>
+        <tr>
+          <td><span data-lang-content="zh">财务人员</span><span data-lang-content="en">Finance staff</span></td>
+          <td><span data-lang-content="zh">3人 × ₱25K = ₱75K/月</span><span data-lang-content="en">3 × ₱25K = ₱75K/mo</span></td>
+          <td><span data-lang-content="zh">1.5人 × ₱25K = ₱37.5K/月</span><span data-lang-content="en">1.5 × ₱25K = ₱37.5K/mo</span></td>
+          <td class="savings">₱37,500</td>
+        </tr>
+        <tr>
+          <td><span data-lang-content="zh">办证时间</span><span data-lang-content="en">Permit time</span></td>
+          <td><span data-lang-content="zh">每月20小时 + 中介费</span><span data-lang-content="en">20 hrs/mo + middlemen fees</span></td>
+          <td><span data-lang-content="zh">每月2小时</span><span data-lang-content="en">2 hrs/mo</span></td>
+          <td class="savings">₱15,000</td>
+        </tr>
+        <tr>
+          <td><span data-lang-content="zh">销售转化</span><span data-lang-content="en">Sales conversion</span></td>
+          <td><span data-lang-content="zh">基准</span><span data-lang-content="en">Baseline</span></td>
+          <td>+15-25%</td>
+          <td class="savings">₱30,000</td>
+        </tr>
+        <tr>
+          <td><span data-lang-content="zh">库存优化</span><span data-lang-content="en">Inventory optim.</span></td>
+          <td><span data-lang-content="zh">基准</span><span data-lang-content="en">Baseline</span></td>
+          <td><span data-lang-content="zh">减少缺货+积压</span><span data-lang-content="en">Less stockout + overstock</span></td>
+          <td class="savings">₱20,000</td>
+        </tr>
+        <tr>
+          <td>Quill Growth</td>
+          <td>—</td>
+          <td>₱20K/<span data-lang-content="zh">月</span><span data-lang-content="en">mo</span></td>
+          <td class="savings" style="color:var(--text-muted);">−₱20,000</td>
+        </tr>
+        <tr class="total">
+          <td><span data-lang-content="zh">净月度收益</span><span data-lang-content="en">Net monthly</span></td>
+          <td>—</td><td>—</td>
+          <td class="savings">₱82,500/<span data-lang-content="zh">月</span><span data-lang-content="en">mo</span></td>
+        </tr>
+        <tr class="total">
+          <td><span data-lang-content="zh">年度净回报</span><span data-lang-content="en">Net annual</span></td>
+          <td>—</td><td>—</td>
+          <td class="savings">₱990,000/<span data-lang-content="zh">年</span><span data-lang-content="en">yr</span></td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section" id="contact">
+  <div class="container">
+    <div class="eyebrow">Get Started</div>
+    <h2 class="display">
+      <span data-lang-content="zh">我们不是<br>在卖软件。<br>我们在<em>卖回</em>你<br>每天浪费的<em>8小时</em>。</span>
+      <span data-lang-content="en">We don't<br>sell software.<br>We <em>sell back</em><br>your <em>8 hours</em>.</span>
+    </h2>
+    <div class="cta-seal">翰墨自此 · 非负担</div>
+    <div class="cta-buttons">
+      <a href="mailto:hello@getquill.ai" class="btn btn-primary">
+        <span><span data-lang-content="zh">免费咨询</span><span data-lang-content="en">Free consultation</span></span>
+        <span class="arrow">→</span>
+      </a>
+      <a href="#" class="btn btn-secondary">
+        <span data-lang-content="zh">查看主策划书</span>
+        <span data-lang-content="en">View full deck</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-logo display"><em>Quill.</em></div>
+        <div class="footer-cn">翎</div>
+        <p style="color:var(--text-dim); font-size:15px; line-height:1.6; max-width:280px;">
+          <span data-lang-content="zh">为东南亚SME打造的<br>AI驱动企业大脑<br><br>翰墨自此，非负担。</span>
+          <span data-lang-content="en">The AI-driven business brain<br>for Southeast Asian SMEs<br><br>Paperwork, signed off.</span>
+        </p>
+      </div>
+      <div class="footer-col">
+        <h5><span data-lang-content="zh">产品</span><span data-lang-content="en">Product</span></h5>
+        <a href="#problem"><span data-lang-content="zh">问题</span><span data-lang-content="en">Problem</span></a>
+        <a href="#vision"><span data-lang-content="zh">理念</span><span data-lang-content="en">Vision</span></a>
+        <a href="#magic"><span data-lang-content="zh">魔法时刻</span><span data-lang-content="en">Magic</span></a>
+        <a href="#modules"><span data-lang-content="zh">15个模块</span><span data-lang-content="en">15 modules</span></a>
+        <a href="#pricing"><span data-lang-content="zh">定价</span><span data-lang-content="en">Pricing</span></a>
+      </div>
+      <div class="footer-col">
+        <h5><span data-lang-content="zh">联系</span><span data-lang-content="en">Contact</span></h5>
+        <a href="mailto:">Email</a>
+        <a href="#">WhatsApp</a>
+        <a href="#">WeChat</a>
+        <a href="#">LinkedIn</a>
+      </div>
+      <div class="footer-col">
+        <h5><span data-lang-content="zh">资源</span><span data-lang-content="en">Resources</span></h5>
+        <a href="#"><span data-lang-content="zh">主策划书 v3.0</span><span data-lang-content="en">Master plan v3.0</span></a>
+        <a href="#"><span data-lang-content="zh">竞品对比</span><span data-lang-content="en">Competitive analysis</span></a>
+        <a href="#"><span data-lang-content="zh">技术架构</span><span data-lang-content="en">Architecture</span></a>
+        <a href="#"><span data-lang-content="zh">案例研究</span><span data-lang-content="en">Case studies</span></a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div>© 2025 QUILL · 翎</div>
+      <div>CONFIDENTIAL · INTERNAL USE</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // ===== Language Switch =====
+  const langSwitch = document.querySelector('.lang-switch');
+  const langBtns = document.querySelectorAll('[data-lang-btn]');
+  langBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const lang = btn.dataset.langBtn;
+      document.body.dataset.currentLang = lang;
+      langSwitch.dataset.lang = lang;
+      langBtns.forEach(b => b.classList.toggle('active', b === btn));
+      document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+      // Save preference
+      try { localStorage.setItem('lj-lang', lang); } catch(e) {}
+    });
+  });
+  // Restore language
+  try {
+    const saved = localStorage.getItem('lj-lang');
+    if (saved && saved !== 'zh') {
+      document.querySelector(`[data-lang-btn="${saved}"]`)?.click();
+    }
+  } catch(e) {}
+
+  // ===== Scroll Reveal =====
+  const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in-view');
+      }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -80px 0px' });
+  document.querySelectorAll('.reveal, .reveal-stagger').forEach(el => revealObserver.observe(el));
+
+  // ===== Number Counter =====
+  const counterObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const el = entry.target;
+        const target = parseInt(el.dataset.target);
+        const duration = 1800;
+        const start = performance.now();
+        const animate = (now) => {
+          const elapsed = now - start;
+          const progress = Math.min(elapsed / duration, 1);
+          // ease-out cubic
+          const eased = 1 - Math.pow(1 - progress, 3);
+          el.textContent = Math.floor(target * eased);
+          if (progress < 1) requestAnimationFrame(animate);
+          else el.textContent = target;
+        };
+        requestAnimationFrame(animate);
+        counterObserver.unobserve(el);
+      }
+    });
+  }, { threshold: 0.5 });
+  document.querySelectorAll('.counter').forEach(el => counterObserver.observe(el));
+
+  // ===== Cursor Blob (desktop only) =====
+  const blob = document.getElementById('cursorBlob');
+  if (window.matchMedia('(hover: hover)').matches) {
+    let mouseX = 0, mouseY = 0, blobX = 0, blobY = 0;
+    document.addEventListener('mousemove', (e) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+    });
+    const animateBlob = () => {
+      // Smooth lerp
+      blobX += (mouseX - blobX) * 0.1;
+      blobY += (mouseY - blobY) * 0.1;
+      blob.style.transform = `translate(${blobX}px, ${blobY}px) translate(-50%, -50%)`;
+      requestAnimationFrame(animateBlob);
+    };
+    animateBlob();
+  }
+
+  // ===== Hide nav on scroll down, show on scroll up =====
+  const nav = document.getElementById('nav');
+  let lastScroll = 0;
+  let ticking = false;
+  window.addEventListener('scroll', () => {
+    if (!ticking) {
+      requestAnimationFrame(() => {
+        const currentScroll = window.scrollY;
+        if (currentScroll > 200) {
+          if (currentScroll > lastScroll + 5) nav.classList.add('hidden');
+          else if (currentScroll < lastScroll - 5) nav.classList.remove('hidden');
+        } else {
+          nav.classList.remove('hidden');
+        }
+        lastScroll = currentScroll;
+        ticking = false;
+      });
+      ticking = true;
+    }
+  });
+
+  // ===== Parallax on hero =====
+  const heroH1 = document.querySelector('.hero h1');
+  const heroMeta = document.querySelector('.hero-meta-grid');
+  if (heroH1 && heroMeta) {
+    window.addEventListener('scroll', () => {
+      const scrolled = window.scrollY;
+      if (scrolled < window.innerHeight) {
+        heroH1.style.transform = `translateY(${scrolled * 0.15}px)`;
+        heroMeta.style.transform = `translateY(${scrolled * 0.05}px)`;
+        heroH1.style.opacity = Math.max(0, 1 - scrolled / 600);
+      }
+    }, { passive: true });
+  }
+
+  // ===== Smooth scroll for anchor links =====
+  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function(e) {
+      const targetId = this.getAttribute('href');
+      if (targetId === '#') return;
+      const target = document.querySelector(targetId);
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quill — Visual Identity System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@200;300;400;500;600&family=JetBrains+Mono:wght@300;400;500&family=Noto+Serif+SC:wght@200;300;400;600;900&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0A0908;
+    --ink-soft: #1A1816;
+    --paper: #FAF8F3;
+    --paper-soft: #F2EFE7;
+    --paper-warm: #EAE6D9;
+    --vermillion: #8B0000;        /* 朱砂 - 印章红 */
+    --vermillion-soft: #B8413E;
+    --bronze: #A8804B;             /* 古铜 */
+    --linen: #D9D4C7;              /* 亚麻 */
+    --line: #D9D4C7;
+    --line-strong: #B5AE9A;
+    --muted: #847F6F;
+
+    --serif: 'Instrument Serif', 'Cormorant Garamond', Georgia, serif;
+    --serif-cn: 'Noto Serif SC', serif;
+    --sans: 'Inter Tight', -apple-system, sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.5;
+    overflow-x: hidden;
+    font-feature-settings: "ss01";
+  }
+  ::selection { background: var(--vermillion); color: var(--paper); }
+
+  /* Paper texture overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.6' seed='3'/%3E%3CfeColorMatrix values='0 0 0 0 0.04 0 0 0 0 0.035 0 0 0 0 0.03 0 0 0 0.025 0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1;
+    mix-blend-mode: multiply;
+  }
+
+  .container {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 80px;
+    position: relative;
+    z-index: 2;
+  }
+  @media (max-width: 768px) { .container { padding: 0 24px; } }
+
+  /* ─────────────────────────────────────────
+     COVER PAGE
+     ───────────────────────────────────────── */
+  .cover {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(10,9,8,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(10,9,8,0.03) 1px, transparent 1px);
+    background-size: 80px 80px;
+    pointer-events: none;
+  }
+  .cover-content {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+  }
+  .cover-corner {
+    position: absolute;
+    top: 40px;
+    right: 80px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    text-align: right;
+  }
+  .cover-corner .line {
+    width: 60px;
+    height: 1px;
+    background: var(--vermillion);
+    margin: 12px 0 12px auto;
+  }
+  .cover-meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 80px;
+  }
+  .cover-title {
+    font-family: var(--serif);
+    font-style: italic;
+    font-weight: 400;
+    font-size: clamp(120px, 22vw, 360px);
+    line-height: 0.85;
+    letter-spacing: -0.05em;
+    color: var(--ink);
+  }
+  .cover-period {
+    font-family: var(--serif-cn);
+    font-size: clamp(56px, 8vw, 140px);
+    color: var(--vermillion);
+    margin-top: 24px;
+    letter-spacing: 0.05em;
+    font-weight: 200;
+  }
+  .cover-subtitle {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 28px;
+    color: var(--muted);
+    margin-top: 60px;
+    max-width: 720px;
+    line-height: 1.4;
+  }
+  .cover-footer {
+    position: absolute;
+    bottom: 40px;
+    left: 80px;
+    right: 80px;
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+  }
+  @media (max-width: 768px) {
+    .cover-corner { right: 24px; top: 24px; }
+    .cover-footer { left: 24px; right: 24px; bottom: 24px; }
+  }
+
+  /* ─────────────────────────────────────────
+     SECTION FRAME
+     ───────────────────────────────────────── */
+  section.chapter {
+    padding: 160px 0;
+    border-bottom: 1px solid var(--line);
+    position: relative;
+  }
+  section.chapter:last-child { border-bottom: none; }
+
+  .chapter-num {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 240px;
+    color: var(--paper-warm);
+    line-height: 1;
+    position: absolute;
+    top: 100px;
+    right: 80px;
+    user-select: none;
+    z-index: 1;
+    letter-spacing: -0.05em;
+  }
+  @media (max-width: 768px) { .chapter-num { font-size: 140px; right: 24px; top: 60px; } }
+
+  .chapter-eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--vermillion);
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+    position: relative;
+    z-index: 2;
+  }
+  .chapter-eyebrow::before {
+    content: '';
+    display: inline-block;
+    width: 40px;
+    height: 1px;
+    background: var(--vermillion);
+    margin-right: 16px;
+    vertical-align: middle;
+  }
+  .chapter-title {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: clamp(64px, 8vw, 128px);
+    line-height: 0.92;
+    letter-spacing: -0.035em;
+    color: var(--ink);
+    position: relative;
+    z-index: 2;
+  }
+  .chapter-title em {
+    font-style: italic;
+  }
+  .chapter-sub {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 24px;
+    color: var(--muted);
+    margin-top: 32px;
+    max-width: 760px;
+    line-height: 1.5;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* ─────────────────────────────────────────
+     PHILOSOPHY (CH 01)
+     ───────────────────────────────────────── */
+  .philosophy-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 100px;
+    margin-top: 120px;
+  }
+  @media (max-width: 968px) { .philosophy-grid { grid-template-columns: 1fr; gap: 60px; } }
+  .pillar {
+    border-top: 1px solid var(--ink);
+    padding-top: 32px;
+  }
+  .pillar-num {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+  .pillar-title {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 56px;
+    font-weight: 400;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
+    margin-bottom: 24px;
+    color: var(--vermillion);
+  }
+  .pillar-text {
+    font-family: var(--serif);
+    font-size: 19px;
+    line-height: 1.65;
+    color: var(--ink);
+  }
+  .pillar-cn {
+    font-family: var(--serif-cn);
+    font-size: 22px;
+    color: var(--muted);
+    margin-top: 24px;
+    line-height: 1.6;
+    font-weight: 300;
+  }
+
+  /* ─────────────────────────────────────────
+     LOGO LAB (CH 02)
+     ───────────────────────────────────────── */
+  .logo-system {
+    margin-top: 120px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  @media (max-width: 968px) { .logo-system { grid-template-columns: 1fr; } }
+  .logo-tile {
+    background: var(--paper);
+    padding: 80px 60px;
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--line);
+    position: relative;
+    overflow: hidden;
+  }
+  .logo-tile.featured {
+    grid-column: span 2;
+    aspect-ratio: 2.2 / 1;
+  }
+  @media (max-width: 968px) { .logo-tile.featured { grid-column: span 1; aspect-ratio: 1; } }
+  .logo-tile.dark { background: var(--ink); color: var(--paper); }
+  .logo-tile.vermillion { background: var(--vermillion); color: var(--paper); }
+  .logo-tile.linen { background: var(--paper-warm); }
+
+  .tile-corner {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.25em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .logo-tile.dark .tile-corner { color: rgba(250,248,243,0.5); }
+  .logo-tile.vermillion .tile-corner { color: rgba(250,248,243,0.6); }
+
+  .tile-canvas {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .tile-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .logo-tile.dark .tile-footer { color: rgba(250,248,243,0.5); }
+  .logo-tile.vermillion .tile-footer { color: rgba(250,248,243,0.6); }
+
+  /* ─────────────────────────────────────────
+     COLOR SYSTEM (CH 03)
+     ───────────────────────────────────────── */
+  .colors {
+    margin-top: 120px;
+  }
+  .color-row {
+    display: grid;
+    grid-template-columns: 200px 1fr 200px;
+    gap: 40px;
+    align-items: stretch;
+    padding: 32px 0;
+    border-top: 1px solid var(--line);
+  }
+  .color-row:last-child { border-bottom: 1px solid var(--line); }
+  @media (max-width: 968px) { .color-row { grid-template-columns: 1fr; gap: 16px; } }
+  .color-swatch {
+    height: 160px;
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+  .color-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .color-name {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 48px;
+    letter-spacing: -0.02em;
+    margin-bottom: 12px;
+    line-height: 1;
+  }
+  .color-cn {
+    font-family: var(--serif-cn);
+    font-size: 22px;
+    color: var(--muted);
+    margin-bottom: 16px;
+    font-weight: 300;
+  }
+  .color-desc {
+    font-family: var(--serif);
+    font-size: 17px;
+    color: var(--ink);
+    line-height: 1.5;
+    max-width: 480px;
+  }
+  .color-meta {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    line-height: 2;
+    text-align: right;
+  }
+  @media (max-width: 968px) { .color-meta { text-align: left; } }
+  .color-meta strong {
+    display: block;
+    font-weight: 400;
+    color: var(--ink);
+    letter-spacing: 0.1em;
+  }
+
+  /* ─────────────────────────────────────────
+     TYPOGRAPHY (CH 04)
+     ───────────────────────────────────────── */
+  .typo-system {
+    margin-top: 120px;
+  }
+  .typo-row {
+    padding: 80px 0;
+    border-top: 1px solid var(--line);
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 60px;
+  }
+  @media (max-width: 968px) { .typo-row { grid-template-columns: 1fr; gap: 32px; } }
+  .typo-meta-block {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    line-height: 2;
+    text-transform: uppercase;
+  }
+  .typo-meta-block strong {
+    display: block;
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 32px;
+    color: var(--ink);
+    margin-bottom: 24px;
+    letter-spacing: -0.02em;
+    text-transform: none;
+    line-height: 1;
+  }
+  .typo-meta-block .role {
+    color: var(--vermillion);
+    margin-bottom: 16px;
+  }
+  .typo-display {
+    font-family: var(--serif);
+    font-size: clamp(60px, 7vw, 110px);
+    font-weight: 400;
+    line-height: 1;
+    letter-spacing: -0.03em;
+  }
+  .typo-display em { font-style: italic; }
+  .typo-display-cn {
+    font-family: var(--serif-cn);
+    font-size: clamp(48px, 6vw, 88px);
+    font-weight: 300;
+    line-height: 1.1;
+    letter-spacing: 0.05em;
+    color: var(--ink);
+  }
+  .typo-display-cn em {
+    color: var(--vermillion);
+    font-weight: 600;
+  }
+  .typo-body {
+    font-family: var(--sans);
+    font-size: 22px;
+    line-height: 1.5;
+    color: var(--ink);
+    max-width: 700px;
+    font-weight: 400;
+  }
+  .typo-mono {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  /* ─────────────────────────────────────────
+     APPLICATIONS (CH 05) - Mock applications
+     ───────────────────────────────────────── */
+  .applications {
+    margin-top: 120px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+  @media (max-width: 968px) { .applications { grid-template-columns: 1fr; } }
+  .app-tile {
+    aspect-ratio: 1;
+    border: 1px solid var(--line);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .app-tile.business-card {
+    background: var(--paper);
+  }
+  .app-tile.app-screen {
+    background: var(--ink);
+  }
+  .app-tile.envelope {
+    background: var(--paper-warm);
+  }
+  .app-tile.poster {
+    background: var(--vermillion);
+    color: var(--paper);
+  }
+  .app-label {
+    position: absolute;
+    bottom: 24px;
+    left: 24px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .app-tile.app-screen .app-label,
+  .app-tile.poster .app-label { color: rgba(250,248,243,0.5); }
+
+  /* ─────────────────────────────────────────
+     BRAND STORY (CH 06)
+     ───────────────────────────────────────── */
+  .story {
+    margin-top: 100px;
+    max-width: 800px;
+  }
+  .story p {
+    font-family: var(--serif);
+    font-size: 24px;
+    line-height: 1.55;
+    color: var(--ink);
+    margin-bottom: 32px;
+  }
+  .story p.lead {
+    font-style: italic;
+    font-size: 36px;
+    color: var(--vermillion);
+    line-height: 1.4;
+    margin-bottom: 60px;
+    letter-spacing: -0.015em;
+  }
+  .story p em {
+    font-style: italic;
+    color: var(--vermillion);
+  }
+  .story-cn {
+    font-family: var(--serif-cn);
+    font-size: 22px;
+    color: var(--muted);
+    line-height: 1.8;
+    margin-top: 60px;
+    padding-top: 60px;
+    border-top: 1px solid var(--line);
+    font-weight: 300;
+  }
+  .story-divider {
+    text-align: center;
+    margin: 80px 0;
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 32px;
+    color: var(--vermillion);
+    letter-spacing: 0.2em;
+  }
+
+  /* ─────────────────────────────────────────
+     CLOSING / SIGNATURE
+     ───────────────────────────────────────── */
+  .closing {
+    padding: 200px 0;
+    text-align: center;
+    background: var(--ink);
+    color: var(--paper);
+    position: relative;
+    overflow: hidden;
+  }
+  .closing-mark {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: clamp(180px, 24vw, 380px);
+    line-height: 0.9;
+    color: var(--paper);
+    letter-spacing: -0.05em;
+    position: relative;
+  }
+  .closing-seal {
+    display: inline-block;
+    width: 80px;
+    height: 80px;
+    background: var(--vermillion);
+    color: var(--paper);
+    font-family: var(--serif-cn);
+    font-size: 48px;
+    line-height: 80px;
+    margin: 60px auto;
+    font-weight: 600;
+  }
+  .closing-tag {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.4em;
+    color: rgba(250,248,243,0.5);
+    text-transform: uppercase;
+  }
+
+  /* Reveal animations */
+  .reveal { opacity: 0; transform: translateY(40px); transition: opacity 1.2s cubic-bezier(0.16,1,0.3,1), transform 1.2s cubic-bezier(0.16,1,0.3,1); }
+  .reveal.in { opacity: 1; transform: translateY(0); }
+  .cover-content { opacity: 0; animation: fadeIn 1.5s cubic-bezier(0.16,1,0.3,1) 0.3s forwards; }
+  @keyframes fadeIn { to { opacity: 1; } }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════
+     COVER
+     ════════════════════════════════════════ -->
+<section class="cover">
+  <div class="cover-grid"></div>
+  <div class="cover-corner">
+    Visual Identity
+    <div class="line"></div>
+    v 1.0 · 2025
+  </div>
+  <div class="container">
+    <div class="cover-content">
+      <div class="cover-meta">A Brand Foundations Document</div>
+      <div class="cover-title"><em>Quill.</em></div>
+      <div class="cover-period">翎</div>
+      <div class="cover-subtitle">The Visual Identity System.<br>For an AI business OS built with the patience of a calligrapher.</div>
+    </div>
+  </div>
+  <div class="cover-footer">
+    <div>Atelier of Restraint</div>
+    <div>Manila · Shanghai · 2025</div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════
+     CH 01 · PHILOSOPHY
+     ════════════════════════════════════════ -->
+<section class="chapter">
+  <div class="chapter-num">01</div>
+  <div class="container">
+    <div class="reveal">
+      <div class="chapter-eyebrow">Chapter One · 哲学</div>
+      <h1 class="chapter-title">Atelier <em>of</em><br>Restraint.</h1>
+      <p class="chapter-sub">克制之手作。 — 一个矛盾孕育的视觉语言：用最古老的工具（羽毛笔）代表最新的技术（AI），用东方的笔墨传统承载西方的极简主义。</p>
+    </div>
+
+    <div class="philosophy-grid">
+      <div class="pillar reveal">
+        <div class="pillar-num">01 · Form & Space</div>
+        <h3 class="pillar-title">形 与 空</h3>
+        <p class="pillar-text">每一个元素都必须证明自己存在的必要。一根线条、一个字符、一片留白——每一处都经过深思熟虑，如同书法家落笔之前的凝神。</p>
+        <p class="pillar-cn">80% 的留白，承载 20% 的内容。让眼睛得以呼吸，让思想得以沉淀。</p>
+      </div>
+
+      <div class="pillar reveal">
+        <div class="pillar-num">02 · Color & Material</div>
+        <h3 class="pillar-title">墨 与 朱</h3>
+        <p class="pillar-text">羊皮纸的米白、墨水的深黑、印章的朱砂、铜的微光、亚麻的灰。每一种颜色都来自古老的书写场景。</p>
+        <p class="pillar-cn">朱砂是品牌的"心跳"——出现得很少，但每一次出现都有意义。</p>
+      </div>
+
+      <div class="pillar reveal">
+        <div class="pillar-num">03 · Craft & Texture</div>
+        <h3 class="pillar-title">笔 与 痕</h3>
+        <p class="pillar-text">数字时代的设计早已遗忘了"手感"。Quill 要把它找回来——通过纸面纹理、笔画末端、字体的光学调整，留下人手的痕迹。</p>
+        <p class="pillar-cn">每一处细节经得起 100 倍放大。这是奢侈品级的工艺标准。</p>
+      </div>
+
+      <div class="pillar reveal">
+        <div class="pillar-num">04 · Rhythm & Authority</div>
+        <h3 class="pillar-title">节 与 律</h3>
+        <p class="pillar-text">先静后动，先大后小，先黑后红。重大场景极度克制，朱砂几乎不出现；交互场景才让朱砂登场——但永远不超过画面的 5%。</p>
+        <p class="pillar-cn">斜体（Italic）是 Quill 的灵魂——它代表流动、书写、人的痕迹。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════
+     CH 02 · LOGO SYSTEM
+     ════════════════════════════════════════ -->
+<section class="chapter">
+  <div class="chapter-num">02</div>
+  <div class="container">
+    <div class="reveal">
+      <div class="chapter-eyebrow">Chapter Two · 标志</div>
+      <h1 class="chapter-title">The <em>Mark</em>.</h1>
+      <p class="chapter-sub">Quill 的标志系统由四个相互配合的元素组成：主字标、印记符号、中文印章、英中合璧。每一个都在不同场景下发声。</p>
+    </div>
+
+    <div class="logo-system">
+
+      <!-- TILE 1 · Primary Wordmark (Featured) -->
+      <div class="logo-tile featured reveal">
+        <div class="tile-corner">01 · Primary Wordmark</div>
+        <div class="tile-canvas">
+          <svg viewBox="0 0 600 240" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" style="max-width: 500px;">
+            <!-- Quill in Instrument Serif Italic -->
+            <text x="300" y="160"
+                  text-anchor="middle"
+                  font-family="Instrument Serif, Georgia, serif"
+                  font-style="italic"
+                  font-weight="400"
+                  font-size="200"
+                  fill="#0A0908"
+                  letter-spacing="-6">Quill</text>
+            <!-- Vermillion period as signature -->
+            <circle cx="488" cy="155" r="9" fill="#8B0000"/>
+          </svg>
+        </div>
+        <div class="tile-footer">
+          <span>Master Logo</span>
+          <span>For all primary uses</span>
+        </div>
+      </div>
+
+      <!-- TILE 2 · Quill Mark (icon) -->
+      <div class="logo-tile reveal">
+        <div class="tile-corner">02 · Mark · 翎</div>
+        <div class="tile-canvas">
+          <svg viewBox="0 0 200 200" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" style="max-width: 180px;">
+            <!-- A single feather quill abstracted -->
+            <!-- Main stem curve - sharp top to nib -->
+            <path d="M 145 30 Q 110 60, 85 100 Q 65 135, 55 175"
+                  stroke="#0A0908" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+            <!-- Feather barbs - decreasing length as descending -->
+            <path d="M 145 30 Q 130 35, 110 55" stroke="#0A0908" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+            <path d="M 140 40 Q 120 50, 100 70" stroke="#0A0908" stroke-width="1" fill="none" stroke-linecap="round"/>
+            <path d="M 132 52 Q 110 62, 90 85" stroke="#0A0908" stroke-width="0.9" fill="none" stroke-linecap="round"/>
+            <path d="M 122 68 Q 102 78, 82 100" stroke="#0A0908" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+            <path d="M 110 88 Q 92 100, 75 120" stroke="#0A0908" stroke-width="0.7" fill="none" stroke-linecap="round"/>
+            <path d="M 98 110 Q 82 122, 68 142" stroke="#0A0908" stroke-width="0.6" fill="none" stroke-linecap="round"/>
+            <!-- Nib tip with vermillion ink drop -->
+            <circle cx="55" cy="175" r="4" fill="#8B0000"/>
+          </svg>
+        </div>
+        <div class="tile-footer">
+          <span>Icon Mark</span>
+          <span>For app/favicon</span>
+        </div>
+      </div>
+
+      <!-- TILE 3 · Chinese Seal -->
+      <div class="logo-tile vermillion reveal">
+        <div class="tile-corner">03 · 印 · Seal</div>
+        <div class="tile-canvas">
+          <svg viewBox="0 0 200 200" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" style="max-width: 180px;">
+            <!-- Vermillion seal-style square with carved-feel character -->
+            <rect x="30" y="30" width="140" height="140" rx="4" fill="none" stroke="#FAF8F3" stroke-width="3"/>
+            <text x="100" y="135"
+                  text-anchor="middle"
+                  font-family="Noto Serif SC, serif"
+                  font-weight="900"
+                  font-size="92"
+                  fill="#FAF8F3">翎</text>
+          </svg>
+        </div>
+        <div class="tile-footer">
+          <span style="color: rgba(250,248,243,0.6);">Chinese Seal</span>
+          <span style="color: rgba(250,248,243,0.6);">For CN markets</span>
+        </div>
+      </div>
+
+      <!-- TILE 4 · Bilingual Lockup -->
+      <div class="logo-tile dark reveal">
+        <div class="tile-corner">04 · Bilingual Lockup</div>
+        <div class="tile-canvas">
+          <div style="display: flex; align-items: center; gap: 40px;">
+            <svg viewBox="0 0 220 80" width="100%" xmlns="http://www.w3.org/2000/svg" style="max-width: 200px;">
+              <text x="0" y="60"
+                    font-family="Instrument Serif, Georgia, serif"
+                    font-style="italic"
+                    font-weight="400"
+                    font-size="72"
+                    fill="#FAF8F3"
+                    letter-spacing="-2">Quill</text>
+              <circle cx="185" cy="58" r="4" fill="#8B0000"/>
+            </svg>
+            <div style="width: 1px; height: 50px; background: rgba(250,248,243,0.3);"></div>
+            <div style="font-family: 'Noto Serif SC', serif; font-weight: 300; font-size: 56px; color: #FAF8F3; line-height: 1; letter-spacing: 0.05em;">翎</div>
+          </div>
+        </div>
+        <div class="tile-footer">
+          <span style="color: rgba(250,248,243,0.5);">Bilingual · 中英合璧</span>
+          <span style="color: rgba(250,248,243,0.5);">For CN/EN co-branding</span>
+        </div>
+      </div>
+
+      <!-- TILE 5 · Q Monogram -->
+      <div class="logo-tile linen reveal">
+        <div class="tile-corner">05 · Q · Monogram</div>
+        <div class="tile-canvas">
+          <svg viewBox="0 0 200 200" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" style="max-width: 160px;">
+            <!-- Q letter - circle + tail like a quill stroke -->
+            <circle cx="90" cy="90" r="55" fill="none" stroke="#0A0908" stroke-width="3"/>
+            <!-- The tail of Q drawn like a calligraphic flick -->
+            <path d="M 120 120 Q 145 145, 160 170" stroke="#0A0908" stroke-width="3" stroke-linecap="round" fill="none"/>
+            <!-- Vermillion dot at tail end -->
+            <circle cx="160" cy="170" r="5" fill="#8B0000"/>
+          </svg>
+        </div>
+        <div class="tile-footer">
+          <span>Monogram</span>
+          <span>For social/avatar</span>
+        </div>
+      </div>
+
+      <!-- TILE 6 · Stacked Vertical -->
+      <div class="logo-tile reveal">
+        <div class="tile-corner">06 · Stacked · 立式</div>
+        <div class="tile-canvas">
+          <div style="text-align: center;">
+            <div style="font-family: 'Instrument Serif', serif; font-style: italic; font-size: 92px; line-height: 0.9; color: #0A0908; letter-spacing: -3px;">Quill<span style="color: #8B0000;">.</span></div>
+            <div style="width: 60px; height: 1px; background: #B5AE9A; margin: 16px auto;"></div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.3em; color: #847F6F; text-transform: uppercase;">Paperwork, Signed Off</div>
+          </div>
+        </div>
+        <div class="tile-footer">
+          <span>Vertical Lockup</span>
+          <span>For posters/print</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Construction grid note -->
+    <div style="margin-top: 80px; padding: 40px; background: var(--paper-warm); border-left: 3px solid var(--vermillion);" class="reveal">
+      <div style="font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em; color: var(--vermillion); text-transform: uppercase; margin-bottom: 16px;">构造原理 · Construction</div>
+      <p style="font-family: var(--serif); font-style: italic; font-size: 22px; line-height: 1.5; color: var(--ink); letter-spacing: -0.01em;">
+        Logo 由两个元素组成：<strong>Instrument Serif 的 Quill 斜体字标</strong>+ <strong>朱砂句点</strong>。<br>
+        句点是设计的"灵魂"——它是文书工作结束的"签字落款"，也是中国印章的现代化身。<br>
+        当其他SaaS品牌用感叹号、箭头、加载圈，Quill用一个<strong>句点</strong>——说完。
+      </p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════
+     CH 03 · COLOR SYSTEM
+     ════════════════════════════════════════ -->
+<section class="chapter" style="background: var(--paper-soft);">
+  <div class="chapter-num">03</div>
+  <div class="container">
+    <div class="reveal">
+      <div class="chapter-eyebrow">Chapter Three · 色彩</div>
+      <h1 class="chapter-title">墨 与 <em>朱砂</em>.</h1>
+      <p class="chapter-sub">五种颜色，源自古老的书写场景。每一种都有自己的角色，从不越界。整套配色系统的灵魂是 80% 黑白 + 5% 朱砂的极致比例。</p>
+    </div>
+
+    <div class="colors">
+      <div class="color-row reveal">
+        <div class="color-swatch" style="background: #0A0908;"></div>
+        <div class="color-info">
+          <div class="color-name">Ink <em>·</em> 墨</div>
+          <div class="color-cn">主色 · 承载所有思考</div>
+          <div class="color-desc">所有文字、Logo 主体、骨架结构。永远是表达的核心。</div>
+        </div>
+        <div class="color-meta">
+          <strong>INK · 墨</strong>
+          HEX #0A0908<br>
+          RGB 10 · 9 · 8<br>
+          CMYK 0 · 10 · 20 · 96<br>
+          PANTONE Black 6 C
+        </div>
+      </div>
+
+      <div class="color-row reveal">
+        <div class="color-swatch" style="background: #FAF8F3; border: 1px solid var(--line);"></div>
+        <div class="color-info">
+          <div class="color-name">Paper <em>·</em> 纸</div>
+          <div class="color-cn">底色 · 一切的开端</div>
+          <div class="color-desc">背景、画布。不是纯白——略带温暖的米色，让眼睛舒适。</div>
+        </div>
+        <div class="color-meta">
+          <strong>PAPER · 纸</strong>
+          HEX #FAF8F3<br>
+          RGB 250 · 248 · 243<br>
+          CMYK 0 · 1 · 3 · 2<br>
+          PANTONE 11-0602 TPX
+        </div>
+      </div>
+
+      <div class="color-row reveal">
+        <div class="color-swatch" style="background: #8B0000;"></div>
+        <div class="color-info">
+          <div class="color-name">Vermillion <em>·</em> 朱砂</div>
+          <div class="color-cn">点睛 · 品牌的心跳</div>
+          <div class="color-desc">CTA、强调、印章。从不超过画面 5%。每次出现都是一次"签字"。</div>
+        </div>
+        <div class="color-meta">
+          <strong>VERMILLION · 朱</strong>
+          HEX #8B0000<br>
+          RGB 139 · 0 · 0<br>
+          CMYK 25 · 100 · 100 · 25<br>
+          PANTONE 7621 C
+        </div>
+      </div>
+
+      <div class="color-row reveal">
+        <div class="color-swatch" style="background: #A8804B;"></div>
+        <div class="color-info">
+          <div class="color-name">Bronze <em>·</em> 铜</div>
+          <div class="color-cn">细节 · 精致的低语</div>
+          <div class="color-desc">分割线、标签、次要装饰。提示精致的存在，但绝不喧宾夺主。</div>
+        </div>
+        <div class="color-meta">
+          <strong>BRONZE · 铜</strong>
+          HEX #A8804B<br>
+          RGB 168 · 128 · 75<br>
+          CMYK 25 · 45 · 75 · 10<br>
+          PANTONE 7556 C
+        </div>
+      </div>
+
+      <div class="color-row reveal">
+        <div class="color-swatch" style="background: #EAE6D9;"></div>
+        <div class="color-info">
+          <div class="color-name">Linen <em>·</em> 麻</div>
+          <div class="color-cn">过渡 · 让一切归于平静</div>
+          <div class="color-desc">卡片背景、次要区域。把所有元素温柔地连接起来。</div>
+        </div>
+        <div class="color-meta">
+          <strong>LINEN · 麻</strong>
+          HEX #EAE6D9<br>
+          RGB 234 · 230 · 217<br>
+          CMYK 5 · 7 · 15 · 8<br>
+          PANTONE 11-0507 TCX
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top: 100px; padding: 60px; background: var(--paper); border-radius: 4px;" class="reveal">
+      <div style="font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em; color: var(--vermillion); margin-bottom: 24px; text-transform: uppercase;">使用比例 · Color Ratio</div>
+      <div style="display: flex; height: 60px; border-radius: 2px; overflow: hidden;">
+        <div style="background: #FAF8F3; flex: 60; border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 0.15em;">PAPER 60%</div>
+        <div style="background: #0A0908; flex: 30; color: var(--paper); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 11px; letter-spacing: 0.15em;">INK 30%</div>
+        <div style="background: #EAE6D9; flex: 5; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 9px; color: var(--muted); letter-spacing: 0.1em;">LINEN</div>
+        <div style="background: #A8804B; flex: 3; display: flex; align-items: center; justify-content: center; color: var(--paper); font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em;">BR</div>
+        <div style="background: #8B0000; flex: 2; display: flex; align-items: center; justify-content: center; color: var(--paper); font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em;">V</div>
+      </div>
+      <p style="margin-top: 24px; font-family: var(--serif); font-style: italic; font-size: 19px; color: var(--muted);">
+        这不是规则，是品味。<br>
+        当 朱砂 突破 5%，品牌就开始尖叫；当它退回 2%，品牌开始低语。<br>
+        我们要的是后者。
+      </p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════
+     CH 04 · TYPOGRAPHY
+     ════════════════════════════════════════ -->
+<section class="chapter">
+  <div class="chapter-num">04</div>
+  <div class="container">
+    <div class="reveal">
+      <div class="chapter-eyebrow">Chapter Four · 字体</div>
+      <h1 class="chapter-title">Four <em>Voices</em>.</h1>
+      <p class="chapter-sub">四种字体，承担四种表达任务。它们彼此区分，但形成一个有机的整体。所有字体都免费，但用在一起就是奢侈品。</p>
+    </div>
+
+    <div class="typo-system">
+
+      <div class="typo-row reveal">
+        <div class="typo-meta-block">
+          <strong>Instrument Serif</strong>
+          <div class="role">Display · 标题 / Logo</div>
+          <div>By Instrument</div>
+          <div>SIL Open Font License</div>
+          <div>Free · Google Fonts</div>
+        </div>
+        <div>
+          <div class="typo-display"><em>Paperwork,</em><br>signed off.</div>
+          <p style="margin-top: 32px; font-family: var(--serif); font-style: italic; font-size: 18px; color: var(--muted); max-width: 600px; line-height: 1.5;">
+            Italic 是它的灵魂——细而有力，带着18世纪欧洲文人书房的气质。所有 Quill 的英文标题都用这套字体。
+          </p>
+        </div>
+      </div>
+
+      <div class="typo-row reveal">
+        <div class="typo-meta-block">
+          <strong>Noto Serif SC</strong>
+          <div class="role">Chinese Display · 中文标题</div>
+          <div>By Google + Adobe</div>
+          <div>SIL Open Font License</div>
+          <div>Free · Google Fonts</div>
+        </div>
+        <div>
+          <div class="typo-display-cn">翰墨自此，<br><em>非负担</em>。</div>
+          <p style="margin-top: 32px; font-family: var(--serif); font-style: italic; font-size: 18px; color: var(--muted); max-width: 600px; line-height: 1.5;">
+            宋体的端正 + 微妙的衬线。和 Instrument Serif 形成完美的"中西呼应"。Weight 200-300 用于大标题，900 用于印章。
+          </p>
+        </div>
+      </div>
+
+      <div class="typo-row reveal">
+        <div class="typo-meta-block">
+          <strong>Inter Tight</strong>
+          <div class="role">Body & UI · 正文 / 界面</div>
+          <div>By Rasmus Andersson</div>
+          <div>SIL Open Font License</div>
+          <div>Free · Google Fonts</div>
+        </div>
+        <div>
+          <div class="typo-body">
+            Quill 通过 AI 帮你处理所有政府文书工作。拍一张表格照片，系统自动从你的企业档案库填好所有字段，3 分钟生成可打印 PDF——本来需要 4 小时的事。
+          </div>
+          <p style="margin-top: 32px; font-family: var(--serif); font-style: italic; font-size: 18px; color: var(--muted); max-width: 600px; line-height: 1.5;">
+            极佳的可读性、几何精准、不抢戏。所有App内、网页正文、说明文字都用这个。
+          </p>
+        </div>
+      </div>
+
+      <div class="typo-row reveal">
+        <div class="typo-meta-block">
+          <strong>JetBrains Mono</strong>
+          <div class="role">Mono · 技术细节 / 标签</div>
+          <div>By JetBrains</div>
+          <div>SIL Open Font License</div>
+          <div>Free · Open source</div>
+        </div>
+        <div>
+          <div class="typo-mono">
+            QUILL/PERMIT &middot; v1.0 &middot; MAYORS_PERMIT_QC &middot; CONFIDENCE 0.94<br>
+            BIR_2550M &middot; FILING_PERIOD 2025-Q2 &middot; STATUS: READY_FOR_REVIEW<br>
+            DOCUMENT_ID: doc_8821a · CREATED_AT: 2025-05-22T08:14:00+08:00
+          </div>
+          <p style="margin-top: 32px; font-family: var(--serif); font-style: italic; font-size: 18px; color: var(--muted); max-width: 600px; line-height: 1.5;">
+            所有"机器说话"的地方——文件名、ID、时间戳、状态标签——都用它。
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════
+     CH 05 · APPLICATIONS
+     ════════════════════════════════════════ -->
+<section class="chapter" style="background: var(--paper-soft);">
+  <div class="chapter-num">05</div>
+  <div class="container">
+    <div class="reveal">
+      <div class="chapter-eyebrow">Chapter Five · 应用</div>
+      <h1 class="chapter-title">From <em>Mark</em><br>to <em>World</em>.</h1>
+      <p class="chapter-sub">Logo 不是终点，而是起点。下面是 Quill 视觉系统在不同场景中的应用——名片、App、信封、海报。同一套语言，无数种表达。</p>
+    </div>
+
+    <div class="applications">
+
+      <!-- Business Card -->
+      <div class="app-tile business-card reveal" style="padding: 60px; display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+          <svg viewBox="0 0 200 50" width="120" xmlns="http://www.w3.org/2000/svg">
+            <text x="0" y="40"
+                  font-family="Instrument Serif, Georgia, serif"
+                  font-style="italic"
+                  font-weight="400"
+                  font-size="48"
+                  fill="#0A0908"
+                  letter-spacing="-1">Quill</text>
+            <circle cx="113" cy="38" r="3" fill="#8B0000"/>
+          </svg>
+        </div>
+        <div>
+          <div style="font-family: var(--serif); font-style: italic; font-size: 22px; color: var(--ink); margin-bottom: 8px;">Li Jianhua</div>
+          <div style="font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase;">Founder / 创始人</div>
+          <div style="width: 32px; height: 1px; background: var(--vermillion); margin: 16px 0;"></div>
+          <div style="font-family: var(--sans); font-size: 13px; color: var(--ink); line-height: 1.6;">
+            hello@getquill.ai<br>
+            +63 ··· ····<br>
+            Manila · Philippines
+          </div>
+        </div>
+        <div class="app-label">01 · Business Card</div>
+      </div>
+
+      <!-- App Screen mockup -->
+      <div class="app-tile app-screen reveal" style="padding: 0; position: relative;">
+        <div style="padding: 32px; height: 100%; display: flex; flex-direction: column;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
+            <svg viewBox="0 0 120 30" width="80" xmlns="http://www.w3.org/2000/svg">
+              <text x="0" y="24"
+                    font-family="Instrument Serif, Georgia, serif"
+                    font-style="italic"
+                    font-weight="400"
+                    font-size="28"
+                    fill="#FAF8F3"
+                    letter-spacing="-1">Quill</text>
+              <circle cx="68" cy="22" r="2" fill="#8B0000"/>
+            </svg>
+            <div style="font-family: var(--mono); font-size: 9px; color: rgba(250,248,243,0.5); letter-spacing: 0.2em;">PERMIT</div>
+          </div>
+
+          <div style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+            <div style="font-family: var(--mono); font-size: 10px; color: rgba(250,248,243,0.5); letter-spacing: 0.2em; margin-bottom: 16px;">DETECTED · 94% CONFIDENCE</div>
+            <div style="font-family: var(--serif); font-style: italic; font-size: 32px; color: var(--paper); line-height: 1.1; margin-bottom: 24px;">BIR Form<br>2550M</div>
+            <div style="font-family: var(--sans); font-size: 13px; color: rgba(250,248,243,0.7); line-height: 1.6; margin-bottom: 24px;">Monthly VAT Declaration<br>Filing period: 2025-Q2</div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="background: var(--vermillion); color: var(--paper); padding: 10px 16px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.15em; border-radius: 2px;">FILL FROM ARCHIVE →</div>
+            </div>
+          </div>
+        </div>
+        <div class="app-label">02 · App Screen</div>
+      </div>
+
+      <!-- Envelope -->
+      <div class="app-tile envelope reveal" style="padding: 60px; display: flex; flex-direction: column; justify-content: space-between; position: relative;">
+        <!-- Vermillion seal in corner -->
+        <div style="position: absolute; top: 40px; right: 40px; width: 60px; height: 60px; background: var(--vermillion); display: flex; align-items: center; justify-content: center;">
+          <span style="font-family: var(--serif-cn); font-weight: 600; color: var(--paper); font-size: 36px; line-height: 1;">翎</span>
+        </div>
+        <div style="margin-top: 80px;">
+          <div style="font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase; margin-bottom: 24px;">FROM</div>
+          <div style="font-family: var(--serif); font-style: italic; font-size: 28px; color: var(--ink); margin-bottom: 8px;">Quill, Inc.</div>
+          <div style="font-family: var(--sans); font-size: 14px; color: var(--ink); line-height: 1.6;">
+            123 Ortigas Avenue<br>
+            Pasig City, Metro Manila<br>
+            Philippines
+          </div>
+        </div>
+        <div class="app-label">03 · Envelope</div>
+      </div>
+
+      <!-- Poster -->
+      <div class="app-tile poster reveal" style="padding: 60px; display: flex; flex-direction: column; justify-content: space-between;">
+        <div style="font-family: var(--mono); font-size: 11px; letter-spacing: 0.25em; color: rgba(250,248,243,0.7);">PRODUCT LAUNCH<br>2025</div>
+
+        <div>
+          <div style="font-family: var(--serif); font-style: italic; font-size: 56px; line-height: 0.95; color: var(--paper); letter-spacing: -0.03em; margin-bottom: 16px;">
+            Two weeks,<br>
+            <span style="color: var(--paper); font-weight: 200;">becomes</span><br>
+            two hours.
+          </div>
+          <div style="width: 40px; height: 1px; background: var(--paper); margin: 24px 0;"></div>
+          <div style="font-family: var(--serif-cn); font-size: 20px; color: rgba(250,248,243,0.7); line-height: 1.5;">两周变两小时。<br>翎 · 办证 · 上线</div>
+        </div>
+
+        <svg viewBox="0 0 100 30" width="60" xmlns="http://www.w3.org/2000/svg">
+          <text x="0" y="24"
+                font-family="Instrument Serif, Georgia, serif"
+                font-style="italic"
+                font-weight="400"
+                font-size="28"
+                fill="#FAF8F3"
+                letter-spacing="-1">Quill</text>
+          <circle cx="68" cy="22" r="2" fill="#FAF8F3"/>
+        </svg>
+        <div class="app-label" style="color: rgba(250,248,243,0.5);">04 · Poster</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════
+     CH 06 · BRAND STORY
+     ════════════════════════════════════════ -->
+<section class="chapter">
+  <div class="chapter-num">06</div>
+  <div class="container">
+    <div class="reveal">
+      <div class="chapter-eyebrow">Chapter Six · 故事</div>
+      <h1 class="chapter-title">The <em>Story</em>.</h1>
+      <p class="chapter-sub">每个伟大的品牌都不是从产品开始的，而是从一个人和一个故事开始的。这是 Quill 的故事。</p>
+    </div>
+
+    <div class="story">
+      <p class="lead">"在菲律宾，老板们最大的浪费不是时间，是<em>注意力</em>。"</p>
+
+      <p>2025 年 1 月，Manila 的所有商业老板都在做同一件事：续 <em>Mayor's Permit</em>。排队、填表、跑部门——这个流程已经存在了几十年，没有人质疑过它，因为<em>"一直都是这样"</em>。</p>
+
+      <p>但 Li Jianhua 觉得这件事不对劲。他家在菲律宾经营 35 年——250 间客房的酒店、PPF 贴膜店、建材批发、咖啡厅。他亲眼看着自己的会计、HR、前台，每年 1 月有 2 周时间几乎完全停摆，只为了"填表"。</p>
+
+      <p>他想：<em>这件事，AI 现在已经能做。为什么没有人做？</em></p>
+
+      <p>答案很简单：硅谷的 AI 公司不懂 BIR。他们的 ERP 解决的是美国问题——SaaS 公司的收入识别、上市公司的合规、连锁餐厅的库存。但东南亚 SME 老板真正想解决的——"<em>能不能不要每年浪费 2 周时间填政府表格</em>"——硅谷觉得太琐碎，看不上。</p>
+
+      <p>于是 Quill 诞生了。</p>
+
+      <p style="font-family: var(--serif); font-style: italic; font-size: 32px; color: var(--vermillion); line-height: 1.3; margin: 60px 0; letter-spacing: -0.015em;">
+        Quill —— 羽毛笔。<br>
+        最古老的书写工具，<br>
+        承载最新的智能。
+      </p>
+
+      <p>我们用 AI 替代你公司里所有"<em>电脑能做却让人做</em>"的事。从拍照填表，到通话转 CRM，到银行自动对账，到会议自动出纪要——一个个模块加上来，最终组成一个完整的<em>企业大脑</em>。</p>
+
+      <p>但我们不叫自己"AI ERP"。<em>那只是技术。</em></p>
+
+      <p>我们叫自己 Quill，因为羽毛笔代表了一种<em>姿态</em>——慢一点，精细一点，有手感一点。即使在 AI 时代，我们依然相信：好的产品来自<em>手艺人</em>的反复打磨，不来自模型的随机生成。</p>
+
+      <p style="font-family: var(--serif); font-style: italic; font-size: 36px; line-height: 1.3; color: var(--ink); letter-spacing: -0.015em; margin-top: 80px;">
+        我们不是<em>在卖软件</em>。<br>
+        我们是在<em>卖回</em>你的<em>8 小时</em>。
+      </p>
+    </div>
+
+    <div class="story-divider">⁂</div>
+
+    <div class="story-cn">
+      <p style="margin-bottom: 24px; font-size: 28px; color: var(--vermillion); font-family: var(--serif-cn); font-weight: 600;">翎，文人之笔。</p>
+      <p style="margin-bottom: 20px;">中国古代，文人案头必置一支羽笔——那是身份，更是手艺。它代表着一个人对文字的尊重，对表达的精细，对每一笔起承转合的<strong style="color: var(--vermillion);">耐心</strong>。</p>
+      <p style="margin-bottom: 20px;">今天的企业家也是文人。他们要写合同、签证件、谈判、决策——每一个动作都是一次"<strong style="color: var(--vermillion);">书写</strong>"。但他们没有时间。</p>
+      <p style="margin-bottom: 20px;">Quill（翎），就是要做他们桌头的那支羽笔。<strong style="color: var(--vermillion);">替他们书写</strong>，让他们做更重要的事。</p>
+      <p style="font-style: italic; color: var(--ink); font-family: var(--serif-cn); margin-top: 40px; font-size: 26px;">翰墨自此，非负担。</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════
+     CLOSING / SIGNATURE
+     ════════════════════════════════════════ -->
+<section class="closing">
+  <div class="container">
+    <div class="closing-mark"><em>Quill.</em></div>
+    <div class="closing-seal">翎</div>
+    <div class="closing-tag">PAPERWORK · SIGNED · OFF</div>
+    <div style="margin-top: 80px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.3em; color: rgba(250,248,243,0.3); text-transform: uppercase;">
+      Brand Identity · v 1.0 · 2025<br>
+      Atelier of Restraint
+    </div>
+  </div>
+</section>
+
+<script>
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) entry.target.classList.add('in');
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -80px 0px' });
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>
