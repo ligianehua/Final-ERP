@@ -18,8 +18,34 @@
 - `.env.local.example` created with all required env vars
 - `components.json` (shadcn config) created
 
+---
+
+## Week 1, Day 2 — 2026-05-22
+
+### Done
+- Installed `@supabase/supabase-js` + `@supabase/ssr`
+- `src/lib/db/client.ts` (browser) + `src/lib/db/server.ts` (server)
+- Login + Signup pages with email OTP (2-step flow)
+- `/api/auth/callback` route for session exchange
+
+---
+
+## Week 1, Day 3-5 — 2026-05-22
+
+### Done
+- **Day 3 (Auth)**: Login/signup pages wired to Supabase OTP; route protection
+- **Day 4 (Schema)**: `companies` table migration + 4 RLS policies; applied in Supabase
+- **Day 5 (CRUD)**:
+  - API: `GET/POST /api/companies`, `GET/PATCH/DELETE /api/companies/[id]`
+  - Zod validation (`src/lib/validations/company.ts`)
+  - Dashboard layout (Topbar + Sidebar), sign-out action
+  - Companies list page (empty state + grid)
+  - Create-company dialog form
+  - Company detail page + delete confirmation
+- **Next.js 16 migration**: renamed `middleware.ts` → `proxy.ts` (heeded deprecation)
+- UI components added: Dialog (+ tw-animate-css)
+
 ### Next
-- Day 2: Supabase project setup, env vars, client/server SDK init
-- Install `@supabase/supabase-js` and `@supabase/ssr`
-- Create `src/lib/db/supabase.ts` (browser + server clients)
-- Test connection from an API route
+- Day 6: Vercel deploy + custom domain
+- Day 7: Test from phone, polish. **Week 1 Demo**.
+- Then Week 2: company_people + documents + Storage upload
