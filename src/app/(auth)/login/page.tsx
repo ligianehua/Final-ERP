@@ -118,12 +118,12 @@ export default function LoginPage() {
                     id="otp"
                     type="text"
                     inputMode="numeric"
-                    placeholder="123456"
+                    placeholder="12345678"
                     value={otp}
                     onChange={(e) => setOtp(e.target.value)}
                     required
                     autoFocus
-                    maxLength={6}
+                    maxLength={8}
                   />
                 </div>
               </CardContent>
