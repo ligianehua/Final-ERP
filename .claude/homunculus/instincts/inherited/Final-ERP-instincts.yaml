@@ -1,0 +1,501 @@
+# Instincts generated from https://github.com/ligianehua/Final-ERP
+# Generated: 2026-05-25T09:51:14.536Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: Final-ERP-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/ligianehua/Final-ERP
+---
+
+# Final ERP Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: feat, chore, fix
+
+## Evidence
+
+- 7 commits analyzed
+- Detected conventional commit pattern
+- Examples: feat: Week 1 Day 1 — project skeleton, landing page, UI components, chore: disable pnpm minimum-release-age gate for installs
+
+---
+id: Final-ERP-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/ligianehua/Final-ERP
+---
+
+# Final ERP Commit Length
+
+## Action
+
+Write moderate-length commit messages (~61 characters)
+
+## Evidence
+
+- Average commit message length: 61 chars
+- Based on 7 commits
+
+---
+id: Final-ERP-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/ligianehua/Final-ERP
+---
+
+# Final ERP Naming Files
+
+## Action
+
+Use camelCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: camelCase
+
+---
+id: Final-ERP-import-alias
+trigger: "when importing modules"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/ligianehua/Final-ERP
+---
+
+# Final ERP Import Alias
+
+## Action
+
+Use path aliases (@/, ~/) instead of relative imports
+
+## Evidence
+
+- Import analysis shows alias pattern
+- Example: import { x } from '@/lib/x'
+
+---
+id: Final-ERP-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/ligianehua/Final-ERP
+---
+
+# Final ERP Export Style
+
+## Action
+
+Prefer default exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: default
+
+---
+id: Final-ERP-arch-type-based
+trigger: "when adding new code"
+confidence: 0.8
+domain: architecture
+source: repo-analysis
+source_repo: https://github.com/ligianehua/Final-ERP
+---
+
+# Final ERP Arch Type Based
+
+## Action
+
+Place code in the appropriate type folder (components/, services/, utils/, etc.)
+
+## Evidence
+
+- Type-based module organization detected
+- Folders: app, components, lib, types
+
+---
+id: Final-ERP-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/ligianehua/Final-ERP
+---
+
+# Final ERP Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: Final-ERP-workflow-feature-development
+trigger: "when implementing a new feature"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/ligianehua/Final-ERP
+---
+
+# Final ERP Workflow Feature Development
+
+## Action
+
+Follow the feature-development workflow:
+1. Add feature implementation
+2. Add tests for feature
+3. Update documentation
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~21x per month
+- Files: /*, src/app/*, src/components/ui/*
+
+---
+id: Final-ERP-workflow-add-database-table-and-migrations
+trigger: "when doing add database table and migrations"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/ligianehua/Final-ERP
+---
+
+# Final ERP Workflow Add Database Table And Migrations
+
+## Action
+
+Follow the add-database-table-and-migrations workflow:
+1. Create a new migration SQL file in supabase/migrations/ (e.g., 000X_entity.sql)
+2. Optionally update or add helper SQL files (e.g., triggers, functions)
+3. Update supabase/README.md with migration instructions
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: supabase/migrations/*.sql, supabase/README.md
+
+---
+id: Final-ERP-workflow-implement-api-endpoint-with-ui-and-validation
+trigger: "when doing implement api endpoint with ui and validation"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/ligianehua/Final-ERP
+---
+
+# Final ERP Workflow Implement Api Endpoint With Ui And Validation
+
+## Action
+
+Follow the implement-api-endpoint-with-ui-and-validation workflow:
+1. Create or update API route file(s) in src/app/api/...
+2. Add or update UI page(s) and components in src/app/(dashboard)/... and src/components/...
+3. Add or update validation schema in src/lib/validations/...
+4. Update shared types if needed
+5. Update docs/CHANGELOG.md
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: src/app/api/**/*.ts, src/app/(dashboard)/**/*.tsx, src/components/**/*.tsx
+
+---
+id: Final-ERP-workflow-update-dependency-or-build-tool-configuration
+trigger: "when doing update dependency or build tool configuration"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/ligianehua/Final-ERP
+---
+
+# Final ERP Workflow Update Dependency Or Build Tool Configuration
+
+## Action
+
+Follow the update-dependency-or-build-tool-configuration workflow:
+1. Update package.json with new or changed settings
+2. Update pnpm-workspace.yaml or add .npmrc as needed
+3. Commit minimal changes to configuration files
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: package.json, pnpm-workspace.yaml, .npmrc
+
+---
+id: final-erp-coding-convention-file-naming
+trigger: "When creating a new file in the codebase"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: ligianehua/Final-ERP
+---
+
+# Final Erp Coding Convention File Naming
+
+## Action
+
+Name the file using camelCase
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.files
+- Consistent file naming in src/components/ and src/app/
+
+---
+id: final-erp-coding-convention-function-naming
+trigger: "When defining a new function"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: ligianehua/Final-ERP
+---
+
+# Final Erp Coding Convention Function Naming
+
+## Action
+
+Name the function using camelCase
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.functions
+- TypeScript code in src/lib/ and src/app/
+
+---
+id: final-erp-coding-convention-class-naming
+trigger: "When defining a new class"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: ligianehua/Final-ERP
+---
+
+# Final Erp Coding Convention Class Naming
+
+## Action
+
+Name the class using PascalCase
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.classes
+
+---
+id: final-erp-coding-convention-constant-naming
+trigger: "When declaring a constant"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: ligianehua/Final-ERP
+---
+
+# Final Erp Coding Convention Constant Naming
+
+## Action
+
+Name the constant using SCREAMING_SNAKE_CASE
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.constants
+
+---
+id: final-erp-coding-convention-import-style
+trigger: "When importing modules"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: ligianehua/Final-ERP
+---
+
+# Final Erp Coding Convention Import Style
+
+## Action
+
+Use alias import style
+
+## Evidence
+
+- Pattern in codeStyle.importStyle
+
+---
+id: final-erp-coding-convention-export-style
+trigger: "When exporting modules or components"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: ligianehua/Final-ERP
+---
+
+# Final Erp Coding Convention Export Style
+
+## Action
+
+Use default export style
+
+## Evidence
+
+- Pattern in codeStyle.exportStyle
+
+---
+id: final-erp-testing-pattern-location
+trigger: "When adding tests for a feature or module"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: ligianehua/Final-ERP
+---
+
+# Final Erp Testing Pattern Location
+
+## Action
+
+Place test files in a separate test location outside the main src/ tree
+
+## Evidence
+
+- Pattern in architecture.folderStructure.testLocation
+- Absence of tests in src/
+
+---
+id: final-erp-testing-pattern-feature-sequence
+trigger: "When implementing a new feature"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: ligianehua/Final-ERP
+---
+
+# Final Erp Testing Pattern Feature Sequence
+
+## Action
+
+Add tests for the feature after the main implementation commit
+
+## Evidence
+
+- feature-development workflow commitSequence: 'Add tests for feature' follows 'Add feature implementation'
+
+---
+id: final-erp-git-conventional-commits
+trigger: "When writing a commit message"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: ligianehua/Final-ERP
+---
+
+# Final Erp Git Conventional Commits
+
+## Action
+
+Use conventional commit format with prefixes: feat, fix, chore
+
+## Evidence
+
+- commits.type: conventional
+- commits.prefixes: ['feat', 'chore', 'fix']
+- Examples: 'feat: Week 1 Day 1 — project skeleton, landing page, UI components'
+
+---
+id: final-erp-git-commit-length
+trigger: "When writing a commit message"
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: ligianehua/Final-ERP
+---
+
+# Final Erp Git Commit Length
+
+## Action
+
+Make the commit message descriptive, averaging around 60 characters
+
+## Evidence
+
+- commits.averageLength: 61
+- Examples of commit messages
+
+---
+id: final-erp-workflow-add-database-table-and-migrations
+trigger: "When introducing a new domain entity or table in the database"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: ligianehua/Final-ERP
+---
+
+# Final Erp Workflow Add Database Table And Migrations
+
+## Action
+
+Create a new migration SQL file in supabase/migrations/, optionally update helper SQL files, and update supabase/README.md with migration instructions
+
+## Evidence
+
+- add-database-table-and-migrations workflow
+- Files: supabase/migrations/*.sql, supabase/README.md
+
+---
+id: final-erp-workflow-implement-api-endpoint-with-ui-and-validation
+trigger: "When adding CRUD or feature functionality exposed via API and surfaced in the frontend"
+confidence: 0.85
+domain: workflow
+source: repo-analysis
+source_repo: ligianehua/Final-ERP
+---
+
+# Final Erp Workflow Implement Api Endpoint With Ui And Validation
+
+## Action
+
+Create or update API route file(s), add or update UI page(s) and components, add or update validation schema, update shared types if needed, and update docs/CHANGELOG.md
+
+## Evidence
+
+- implement-api-endpoint-with-ui-and-validation workflow
+- Files: src/app/api/**/*.ts, src/app/(dashboard)/**/*.tsx, src/components/**/*.tsx, src/lib/validations/*.ts, docs/CHANGELOG.md
+
+---
+id: final-erp-workflow-update-dependency-or-build-tool-configuration
+trigger: "When needing to fix or relax package manager/build tool policies to allow builds or installs"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: ligianehua/Final-ERP
+---
+
+# Final Erp Workflow Update Dependency Or Build Tool Configuration
+
+## Action
+
+Update package.json with new or changed settings, update pnpm-workspace.yaml or add .npmrc as needed, and commit minimal changes to configuration files
+
+## Evidence
+
+- update-dependency-or-build-tool-configuration workflow
+- Files: package.json, pnpm-workspace.yaml, .npmrc
+
