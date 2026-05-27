@@ -2,7 +2,7 @@ import Link from "next/link"
 import { createClient } from "@/lib/db/server"
 import { CreateCompanyDialog } from "@/components/forms/create-company-dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Building2 } from "lucide-react"
+import { Building2, User } from "lucide-react"
 import type { Company } from "@/types"
 
 export default async function CompaniesPage() {
@@ -20,7 +20,7 @@ export default async function CompaniesPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Companies</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Your company archive. Each company stores info reused across every form.
+            Your archive of individuals and companies. Upload documents — Quill fills the rest.
           </p>
         </div>
         <CreateCompanyDialog />
@@ -31,40 +31,47 @@ export default async function CompaniesPage() {
           <div className="size-12 rounded-full bg-secondary flex items-center justify-center mx-auto mb-4">
             <Building2 className="size-6 text-muted-foreground" />
           </div>
-          <h3 className="font-medium text-foreground mb-1">No companies yet</h3>
+          <h3 className="font-medium text-foreground mb-1">Nothing here yet</h3>
           <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
-            Create your first company to start building your archive and filling forms.
+            Create your first archive — an individual or a company — to start uploading documents.
           </p>
           <CreateCompanyDialog />
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {list.map((company) => (
-            <Link key={company.id} href={`/companies/${company.id}`}>
+          {list.map((c) => (
+            <Link key={c.id} href={`/companies/${c.id}`}>
               <Card className="hover:border-foreground/20 transition-colors h-full">
                 <CardHeader>
                   <div className="flex items-start gap-3">
                     <div className="size-10 rounded-lg bg-secondary flex items-center justify-center shrink-0">
-                      <Building2 className="size-5 text-foreground" />
+                      {c.entity_type === "individual" ? (
+                        <User className="size-5 text-foreground" />
+                      ) : (
+                        <Building2 className="size-5 text-foreground" />
+                      )}
                     </div>
                     <div className="min-w-0">
-                      <CardTitle className="text-base truncate">{company.name}</CardTitle>
-                      {company.tin && (
-                        <p className="text-xs text-muted-foreground mt-1">TIN: {company.tin}</p>
+                      <CardTitle className="text-base truncate">{c.name}</CardTitle>
+                      {c.tin && (
+                        <p className="text-xs text-muted-foreground mt-1">TIN: {c.tin}</p>
                       )}
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2 text-xs">
-                    {company.vat_status && (
+                    <span className="border border-border rounded px-2 py-0.5 text-muted-foreground">
+                      {c.entity_type === "individual" ? "Individual" : "Company"}
+                    </span>
+                    {c.vat_status && (
                       <span className="border border-border rounded px-2 py-0.5 text-muted-foreground">
-                        {company.vat_status === "vat_registered" ? "VAT Registered" : "Non-VAT"}
+                        {c.vat_status === "vat_registered" ? "VAT Registered" : "Non-VAT"}
                       </span>
                     )}
-                    {company.city && (
+                    {c.city && (
                       <span className="border border-border rounded px-2 py-0.5 text-muted-foreground">
-                        {company.city}
+                        {c.city}
                       </span>
                     )}
                   </div>

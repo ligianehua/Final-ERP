@@ -1,6 +1,9 @@
+export type EntityType = "individual" | "company"
+
 export type Company = {
   id: string
   user_id: string
+  entity_type: EntityType
   name: string
   tin: string | null
   sec_no: string | null
@@ -10,6 +13,9 @@ export type Company = {
   phone: string | null
   email: string | null
   vat_status: "vat_registered" | "non_vat" | null
+  sss_no: string | null
+  philhealth_no: string | null
+  pagibig_no: string | null
   created_at: string
   updated_at: string
 }
@@ -44,18 +50,22 @@ export type Document = {
 }
 
 export type DocumentType =
-  | "MAYORS_PERMIT"
   | "BIR_2303"
+  | "MAYORS_PERMIT"
   | "SEC_CERTIFICATE"
   | "DTI_CERTIFICATE"
+  | "SSS_CERTIFICATE"
+  | "PHILHEALTH_CERTIFICATE"
+  | "PAGIBIG_CERTIFICATE"
+  | "BANK_CERTIFICATE"
   | "OTHER"
 
 export type DocumentFolder =
-  | "company_info"
-  | "people"
-  | "financial_accounts"
-  | "documents"
-  | "employees"
+  | "business_permits"
+  | "tax"
+  | "hr_social"
+  | "financial"
+  | "other"
 
 export type FormTemplate = {
   id: string

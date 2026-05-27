@@ -14,134 +14,152 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Loader2, Plus } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { Building2, Loader2, Plus, User } from "lucide-react"
+import type { EntityType } from "@/types"
 
 export function CreateCompanyDialog() {
   const router = useRouter()
   const [open, setOpen] = useState(false)
+  const [entityType, setEntityType] = useState<EntityType>("company")
+  const [name, setName] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  function reset() {
+    setEntityType("company")
+    setName("")
+    setError(null)
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
-    const formData = new FormData(e.currentTarget)
-    const payload = {
-      name: formData.get("name") as string,
-      tin: (formData.get("tin") as string) || null,
-      sec_no: (formData.get("sec_no") as string) || null,
-      dti_no: (formData.get("dti_no") as string) || null,
-      address: (formData.get("address") as string) || null,
-      city: (formData.get("city") as string) || null,
-      phone: (formData.get("phone") as string) || null,
-      email: (formData.get("email") as string) || null,
-      vat_status: (formData.get("vat_status") as string) || null,
-    }
-
     const res = await fetch("/api/companies", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ entity_type: entityType, name: name.trim() }),
     })
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
-      setError(data.error || "Failed to create company")
+      setError(data.error || "Failed to create")
       setLoading(false)
       return
     }
 
     setOpen(false)
+    reset()
     setLoading(false)
     router.refresh()
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o)
+        if (!o) reset()
+      }}
+    >
       <DialogTrigger asChild>
         <Button className="gap-2">
           <Plus className="size-4" />
-          New company
+          New
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle>New company</DialogTitle>
+          <DialogTitle>New archive</DialogTitle>
           <DialogDescription>
-            Add a company to your archive. Only the name is required — fill the rest anytime.
+            Choose a type and give it a name. You can upload documents to fill the rest later.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-2">
+            <Label>Type</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <EntityTypeButton
+                active={entityType === "individual"}
+                onClick={() => setEntityType("individual")}
+                icon={<User className="size-5" />}
+                label="Individual"
+                hint="Sole proprietor"
+              />
+              <EntityTypeButton
+                active={entityType === "company"}
+                onClick={() => setEntityType("company")}
+                icon={<Building2 className="size-5" />}
+                label="Company"
+                hint="Corporation, partnership"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="name">
+              {entityType === "individual" ? "Full name" : "Company name"}
+            </Label>
+            <Input
+              id="name"
+              required
+              placeholder={
+                entityType === "individual"
+                  ? "Juan dela Cruz"
+                  : "ABC Trading Corporation"
+              }
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+            />
+          </div>
+
           {error && <p className="text-sm text-destructive">{error}</p>}
 
-          <div className="space-y-2">
-            <Label htmlFor="name">Company name *</Label>
-            <Input id="name" name="name" required placeholder="ABC Trading Corporation" autoFocus />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="tin">TIN</Label>
-              <Input id="tin" name="tin" placeholder="123-456-789-000" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="vat_status">VAT status</Label>
-              <select
-                id="vat_status"
-                name="vat_status"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                defaultValue=""
-              >
-                <option value="">Not set</option>
-                <option value="vat_registered">VAT Registered</option>
-                <option value="non_vat">Non-VAT</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="sec_no">SEC No.</Label>
-              <Input id="sec_no" name="sec_no" placeholder="CS201812345" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="dti_no">DTI No.</Label>
-              <Input id="dti_no" name="dti_no" placeholder="DTI-1234567" />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="address">Address</Label>
-            <Input id="address" name="address" placeholder="123 Ayala Ave, Makati" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="city">City</Label>
-              <Input id="city" name="city" placeholder="Makati City" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
-              <Input id="phone" name="phone" placeholder="+63 2 1234 5678" />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" name="email" type="email" placeholder="info@company.com" />
-          </div>
-
           <DialogFooter>
-            <Button type="submit" disabled={loading} className="gap-2">
+            <Button type="submit" disabled={loading || !name.trim()} className="gap-2">
               {loading && <Loader2 className="size-4 animate-spin" />}
-              Create company
+              Create
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function EntityTypeButton({
+  active,
+  onClick,
+  icon,
+  label,
+  hint,
+}: {
+  active: boolean
+  onClick: () => void
+  icon: React.ReactNode
+  label: string
+  hint: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex flex-col items-start gap-1 rounded-lg border p-4 text-left transition-colors",
+        active
+          ? "border-foreground bg-secondary"
+          : "border-border hover:border-foreground/30"
+      )}
+    >
+      <div className="flex items-center gap-2">
+        {icon}
+        <span className="font-medium text-sm">{label}</span>
+      </div>
+      <span className="text-xs text-muted-foreground">{hint}</span>
+    </button>
   )
 }

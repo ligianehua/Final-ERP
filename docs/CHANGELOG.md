@@ -49,3 +49,30 @@
 - Day 6: Vercel deploy + custom domain
 - Day 7: Test from phone, polish. **Week 1 Demo**.
 - Then Week 2: company_people + documents + Storage upload
+
+---
+
+## Week 2, Day 1 — 2026-05-25
+
+### Product direction (decided this session)
+- Entry is **form-first** (Flow B): user uploads a form → AI says what's needed.
+- Archive is the reusable backbone: **company profile + people roster + document library**.
+- Materials vary by form AND by signer; archive doesn't pre-fix a set — filing pulls from it on demand.
+- Creation is intentionally minimal: pick `Individual`/`Company` + name. Profile fields fill via document upload (Week 2-3 AI extraction).
+
+### Done
+- DB: `0002_companies_entity_type.sql` — add `entity_type` + sss/philhealth/pagibig columns to companies
+- DB: `0003_documents.sql` — documents table + 4 RLS policies + indexes
+- Types: `EntityType`, updated `Company`, refined `DocumentType` + `DocumentFolder` for PH context
+- Validation: split into `companyCreateSchema` (minimal: type+name) and `companyUpdateSchema` (full)
+- API: `POST /api/companies` now accepts entity_type
+- UI: rewrote `CreateCompanyDialog` — Individual / Company toggle + single name field
+- UI: list cards show entity-type icon + badge; detail page tailors fields per type
+- "Companies" page copy updated to reflect archive-of-both concept
+
+### Next
+- Day 2-3: Supabase Storage bucket setup + file upload UI
+- Day 4: document list / preview / download / delete
+- Day 5: 5-folder organization + filter
+- Day 6: company_people (officers/employees roster)
+- Day 7: polish + **Week 2 Demo** (upload a real Mayor's Permit)

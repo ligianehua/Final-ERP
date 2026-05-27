@@ -2,9 +2,8 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { createClient } from "@/lib/db/server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { DeleteCompanyButton } from "@/components/forms/delete-company-button"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Building2, User } from "lucide-react"
 import type { Company } from "@/types"
 
 export default async function CompanyDetailPage({
@@ -26,17 +25,39 @@ export default async function CompanyDetailPage({
   }
 
   const c = company as Company
+  const isIndividual = c.entity_type === "individual"
 
-  const fields: Array<{ label: string; value: string | null }> = [
+  const commonFields: Array<{ label: string; value: string | null }> = [
     { label: "TIN", value: c.tin },
-    { label: "SEC No.", value: c.sec_no },
     { label: "DTI No.", value: c.dti_no },
-    { label: "VAT Status", value: c.vat_status === "vat_registered" ? "VAT Registered" : c.vat_status === "non_vat" ? "Non-VAT" : null },
     { label: "Address", value: c.address },
     { label: "City", value: c.city },
     { label: "Phone", value: c.phone },
     { label: "Email", value: c.email },
+    {
+      label: "VAT Status",
+      value:
+        c.vat_status === "vat_registered"
+          ? "VAT Registered"
+          : c.vat_status === "non_vat"
+            ? "Non-VAT"
+            : null,
+    },
   ]
+
+  const companyOnly: Array<{ label: string; value: string | null }> = [
+    { label: "SEC No.", value: c.sec_no },
+  ]
+
+  const individualOnly: Array<{ label: string; value: string | null }> = [
+    { label: "SSS No.", value: c.sss_no },
+    { label: "PhilHealth No.", value: c.philhealth_no },
+    { label: "Pag-IBIG No.", value: c.pagibig_no },
+  ]
+
+  const fields = isIndividual
+    ? [...commonFields, ...individualOnly]
+    : [...companyOnly, ...commonFields]
 
   return (
     <div className="max-w-3xl mx-auto p-6 md:p-8">
@@ -45,19 +66,27 @@ export default async function CompanyDetailPage({
         className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6"
       >
         <ArrowLeft className="size-4" />
-        Back to companies
+        Back
       </Link>
 
       <div className="flex items-start justify-between mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight">{c.name}</h1>
-        <div className="flex gap-2">
-          <DeleteCompanyButton id={c.id} name={c.name} />
+        <div className="flex items-start gap-3">
+          <div className="size-12 rounded-lg bg-secondary flex items-center justify-center shrink-0">
+            {isIndividual ? <User className="size-6" /> : <Building2 className="size-6" />}
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">{c.name}</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              {isIndividual ? "Individual · Sole proprietor" : "Company"}
+            </p>
+          </div>
         </div>
+        <DeleteCompanyButton id={c.id} name={c.name} />
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Company Info</CardTitle>
+          <CardTitle className="text-base">Profile</CardTitle>
         </CardHeader>
         <CardContent>
           <dl className="divide-y divide-border">
@@ -71,8 +100,8 @@ export default async function CompanyDetailPage({
         </CardContent>
       </Card>
 
-      <p className="text-xs text-muted-foreground mt-6">
-        People, documents, and employees coming in Week 2.
+      <p className="text-xs text-muted-foreground mt-6 text-center">
+        Profile fields will auto-fill from uploaded documents (coming soon).
       </p>
     </div>
   )
