@@ -49,6 +49,12 @@ export async function extractDocument(imageDataUrl: string): Promise<ExtractionR
   })
 
   const raw = response.choices[0]?.message?.content ?? ""
+
+  // Log so we can debug what the model actually said. Visible in the
+  // terminal running `next dev`.
+  console.log("[AI extract] model:", model)
+  console.log("[AI extract] raw response:\n" + raw)
+
   const json = extractJSON(raw)
   return extractionResultSchema.parse(json)
 }
