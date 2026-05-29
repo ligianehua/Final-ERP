@@ -76,3 +76,22 @@
 - Day 5: 5-folder organization + filter
 - Day 6: company_people (officers/employees roster)
 - Day 7: polish + **Week 2 Demo** (upload a real Mayor's Permit)
+
+---
+
+## Week 2, Day 2 — 2026-05-28
+
+### Done
+- DB: `0004_storage.sql` — `documents` Storage bucket (private) + 4 RLS policies (path-scoped to user's UUID folder)
+- Validation: `documentCreateSchema` + friendly label maps + per-type default folder
+- API: `GET/POST /api/documents` (list + create-record-after-upload)
+- API: `DELETE /api/documents/[id]` (removes both Storage object and DB row)
+- UI: `UploadDocumentDialog` — file picker (PDF/JPG/PNG, 10 MB max), doc type select, folder auto-fills from type, client-side upload to Storage then POST to record
+- UI: `DocumentList` — per-row download (signed URL) + delete; empty state
+- Detail page: added Documents card with upload button + list
+
+### Next
+- Day 4: preview pane (in-app PDF/image viewer instead of new tab)
+- Day 5: filter by folder + search
+- Day 6: company_people (officers/employees roster)
+- Day 7: polish + **Week 2 Demo**

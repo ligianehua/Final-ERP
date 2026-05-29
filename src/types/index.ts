@@ -36,15 +36,18 @@ export type CompanyPerson = {
 
 export type Document = {
   id: string
+  user_id: string
   company_id: string
   document_type: DocumentType
-  document_number: string | null
   folder: DocumentFolder
-  file_url: string
-  file_name: string
+  document_number: string | null
   issued_date: string | null
   expiry_date: string | null
   issuing_authority: string | null
+  file_path: string
+  file_name: string
+  file_size: number | null
+  mime_type: string | null
   extracted_data: Record<string, unknown> | null
   created_at: string
 }

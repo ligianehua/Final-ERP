@@ -3,8 +3,10 @@ import { notFound } from "next/navigation"
 import { createClient } from "@/lib/db/server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DeleteCompanyButton } from "@/components/forms/delete-company-button"
+import { UploadDocumentDialog } from "@/components/forms/upload-document-dialog"
+import { DocumentList } from "@/components/documents/document-list"
 import { ArrowLeft, Building2, User } from "lucide-react"
-import type { Company } from "@/types"
+import type { Company, Document } from "@/types"
 
 export default async function CompanyDetailPage({
   params,
@@ -14,17 +16,21 @@ export default async function CompanyDetailPage({
   const { id } = await params
   const supabase = await createClient()
 
-  const { data: company } = await supabase
-    .from("companies")
-    .select("*")
-    .eq("id", id)
-    .single()
+  const [{ data: company }, { data: documents }] = await Promise.all([
+    supabase.from("companies").select("*").eq("id", id).single(),
+    supabase
+      .from("documents")
+      .select("*")
+      .eq("company_id", id)
+      .order("created_at", { ascending: false }),
+  ])
 
   if (!company) {
     notFound()
   }
 
   const c = company as Company
+  const docs = (documents ?? []) as Document[]
   const isIndividual = c.entity_type === "individual"
 
   const commonFields: Array<{ label: string; value: string | null }> = [
@@ -84,24 +90,41 @@ export default async function CompanyDetailPage({
         <DeleteCompanyButton id={c.id} name={c.name} />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Profile</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl className="divide-y divide-border">
-            {fields.map((f) => (
-              <div key={f.label} className="flex justify-between py-3 text-sm">
-                <dt className="text-muted-foreground">{f.label}</dt>
-                <dd className="text-foreground font-medium">{f.value || "—"}</dd>
-              </div>
-            ))}
-          </dl>
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Profile</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="divide-y divide-border">
+              {fields.map((f) => (
+                <div key={f.label} className="flex justify-between py-3 text-sm">
+                  <dt className="text-muted-foreground">{f.label}</dt>
+                  <dd className="text-foreground font-medium">{f.value || "—"}</dd>
+                </div>
+              ))}
+            </dl>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <div>
+              <CardTitle className="text-base">Documents</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                {docs.length} {docs.length === 1 ? "file" : "files"}
+              </p>
+            </div>
+            <UploadDocumentDialog companyId={c.id} />
+          </CardHeader>
+          <CardContent>
+            <DocumentList documents={docs} />
+          </CardContent>
+        </Card>
+      </div>
 
       <p className="text-xs text-muted-foreground mt-6 text-center">
-        Profile fields will auto-fill from uploaded documents (coming soon).
+        Profile fields will auto-fill from uploaded documents (Week 3).
       </p>
     </div>
   )
