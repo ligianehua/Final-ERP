@@ -122,7 +122,7 @@ export default async function CompanyDetailPage({
             <UploadDocumentDialog companyId={c.id} />
           </CardHeader>
           <CardContent>
-            <DocumentList documents={docs} />
+            <DocumentList documents={docs} company={c} />
           </CardContent>
         </Card>
       </div>

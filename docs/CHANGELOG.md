@@ -95,3 +95,30 @@
 - Day 5: filter by folder + search
 - Day 6: company_people (officers/employees roster)
 - Day 7: polish + **Week 2 Demo**
+
+---
+
+## Week 2 Mid — 2026-05-28 (Week 3 jumpstart)
+
+### Done — Editable profile
+- `EditCompanyDialog` — type-aware (Company shows SEC; Individual shows SSS/PhilHealth/Pag-IBIG)
+- Empty strings normalize to NULL on save
+
+### Done — AI extraction pipeline (the magic!)
+- **Provider-agnostic** AI layer: OpenAI SDK pointed at any compatible gateway via `AI_BASE_URL` + `AI_API_KEY` + `AI_MODEL`. Default: silra.cn + glm-5.1.
+- `src/lib/ai/client.ts` — unified client
+- `src/lib/ai/prompts.ts` — versioned (`DOCUMENT_EXTRACTION_PROMPT_V1`)
+- `src/lib/ai/extract-document.ts` — sends image data URL, parses JSON, validates with zod
+- `POST /api/documents/[id]/extract` — downloads file from Storage → base64 → AI → cache result on document row
+- UI: Sparkles button on each image document → loading state → results dialog with checkboxes
+- Results dialog: shows extracted fields vs current profile values, user picks what to apply, PATCH to /api/companies/[id]
+- Restriction: images only (JPG/PNG) for v1. PDF support planned (needs server-side pdf-to-image)
+
+### What user needs to set
+- `AI_API_KEY` in .env.local (their silra.cn key)
+- `AI_MODEL=glm-5.1` or `MiniMax-M2.5` (whichever they prefer)
+- Restart dev server to pick up env changes
+
+### Next
+- Test extraction on a real BIR 2303 image
+- Day 4-7 plan: preview, filter, people roster, demo
