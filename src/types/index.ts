@@ -20,11 +20,15 @@ export type Company = {
   updated_at: string
 }
 
+export type PersonRole = "owner" | "officer" | "employee" | "representative"
+
 export type CompanyPerson = {
   id: string
+  user_id: string
   company_id: string
   full_name: string
-  role: "owner" | "officer" | "employee" | "representative"
+  role: PersonRole
+  position_title: string | null
   tin: string | null
   sss_no: string | null
   philhealth_no: string | null
@@ -32,6 +36,7 @@ export type CompanyPerson = {
   email: string | null
   phone: string | null
   created_at: string
+  updated_at: string
 }
 
 export type Document = {

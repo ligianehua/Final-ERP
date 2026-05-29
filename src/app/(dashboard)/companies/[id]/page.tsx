@@ -5,9 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DeleteCompanyButton } from "@/components/forms/delete-company-button"
 import { EditCompanyDialog } from "@/components/forms/edit-company-dialog"
 import { UploadDocumentDialog } from "@/components/forms/upload-document-dialog"
+import { PersonFormDialog } from "@/components/forms/person-form-dialog"
 import { DocumentList } from "@/components/documents/document-list"
+import { PersonList } from "@/components/people/person-list"
 import { ArrowLeft, Building2, User } from "lucide-react"
-import type { Company, Document } from "@/types"
+import type { Company, CompanyPerson, Document } from "@/types"
 
 export default async function CompanyDetailPage({
   params,
@@ -17,10 +19,19 @@ export default async function CompanyDetailPage({
   const { id } = await params
   const supabase = await createClient()
 
-  const [{ data: company }, { data: documents }] = await Promise.all([
+  const [
+    { data: company },
+    { data: documents },
+    { data: people },
+  ] = await Promise.all([
     supabase.from("companies").select("*").eq("id", id).single(),
     supabase
       .from("documents")
+      .select("*")
+      .eq("company_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("company_people")
       .select("*")
       .eq("company_id", id)
       .order("created_at", { ascending: false }),
@@ -32,6 +43,7 @@ export default async function CompanyDetailPage({
 
   const c = company as Company
   const docs = (documents ?? []) as Document[]
+  const peopleList = (people ?? []) as CompanyPerson[]
   const isIndividual = c.entity_type === "individual"
 
   const commonFields: Array<{ label: string; value: string | null }> = [
@@ -111,6 +123,24 @@ export default async function CompanyDetailPage({
           </CardContent>
         </Card>
 
+        {!isIndividual && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle className="text-base">People</CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {peopleList.length}{" "}
+                  {peopleList.length === 1 ? "person" : "people"}
+                </p>
+              </div>
+              <PersonFormDialog companyId={c.id} />
+            </CardHeader>
+            <CardContent>
+              <PersonList people={peopleList} companyId={c.id} />
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <div>
@@ -128,7 +158,7 @@ export default async function CompanyDetailPage({
       </div>
 
       <p className="text-xs text-muted-foreground mt-6 text-center">
-        Profile fields will auto-fill from uploaded documents (Week 3).
+        Profile fields auto-fill from uploaded documents. People are used when filing forms that need a signatory.
       </p>
     </div>
   )
