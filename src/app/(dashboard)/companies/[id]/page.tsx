@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import { createClient } from "@/lib/db/server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DeleteCompanyButton } from "@/components/forms/delete-company-button"
+import { EditCompanyDialog } from "@/components/forms/edit-company-dialog"
 import { UploadDocumentDialog } from "@/components/forms/upload-document-dialog"
 import { DocumentList } from "@/components/documents/document-list"
 import { ArrowLeft, Building2, User } from "lucide-react"
@@ -87,7 +88,10 @@ export default async function CompanyDetailPage({
             </p>
           </div>
         </div>
-        <DeleteCompanyButton id={c.id} name={c.name} />
+        <div className="flex items-center gap-2">
+          <EditCompanyDialog company={c} />
+          <DeleteCompanyButton id={c.id} name={c.name} />
+        </div>
       </div>
 
       <div className="space-y-6">
