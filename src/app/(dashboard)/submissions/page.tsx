@@ -1,7 +1,6 @@
-import Link from "next/link"
 import { createClient } from "@/lib/db/server"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getFormSchema } from "@/lib/forms/registry"
+import { SubmissionActions } from "@/components/submissions/submission-actions"
 import { FileText, History as HistoryIcon } from "lucide-react"
 
 type Submission = {
@@ -10,6 +9,7 @@ type Submission = {
   form_code: string
   status: "draft" | "completed" | "filed"
   period: string | null
+  output_pdf_path: string | null
   updated_at: string
   created_at: string
 }
@@ -88,6 +88,12 @@ export default async function SubmissionsPage() {
                 >
                   {STATUS_LABEL[s.status]}
                 </span>
+                {schema && (
+                  <SubmissionActions
+                    submissionId={s.id}
+                    outputPdfPath={s.output_pdf_path}
+                  />
+                )}
               </li>
             )
           })}
