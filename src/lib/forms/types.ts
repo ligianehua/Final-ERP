@@ -41,7 +41,9 @@ export type FormField = {
   required: boolean
   /** Value changes every filing (period-specific) — never reused. */
   period_specific: boolean
-  /** Optional hint shown next to the input. */
+  /** Short example shown inside the empty input (e.g. "YYYY"). */
+  placeholder?: string
+  /** Longer explanation shown below the input. */
   hint?: string
 }
 
@@ -56,10 +58,12 @@ export type FormSchema = {
 export type FilledField = {
   id: string
   label: string
+  semantic_type: SemanticType
   value: string | null
   source: string | null
   confidence: number
   period_specific: boolean
   required: boolean
+  placeholder?: string
   hint?: string
 }

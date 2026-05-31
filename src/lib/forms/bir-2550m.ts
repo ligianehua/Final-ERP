@@ -11,7 +11,7 @@ export const BIR_2550M_SCHEMA: FormSchema = {
   form_name: "Monthly VAT Declaration",
   agency: "BIR",
   fields: [
-    // Period (user picks for this filing)
+    // Period (user picks for this filing) — auto-synced from top "Period (YYYY-MM)"
     {
       id: "period_month",
       label: "For the Month",
@@ -19,7 +19,7 @@ export const BIR_2550M_SCHEMA: FormSchema = {
       data_source: null,
       required: true,
       period_specific: true,
-      hint: "01-12",
+      placeholder: "01-12",
     },
     {
       id: "period_year",
@@ -28,7 +28,7 @@ export const BIR_2550M_SCHEMA: FormSchema = {
       data_source: null,
       required: true,
       period_specific: true,
-      hint: "YYYY",
+      placeholder: "YYYY",
     },
 
     // Taxpayer identity (pulled from company archive)
@@ -39,6 +39,7 @@ export const BIR_2550M_SCHEMA: FormSchema = {
       data_source: "company.tin",
       required: true,
       period_specific: false,
+      placeholder: "123-456-789-000",
     },
     {
       id: "rdo_code",
@@ -47,6 +48,7 @@ export const BIR_2550M_SCHEMA: FormSchema = {
       data_source: null,
       required: false,
       period_specific: false,
+      placeholder: "000",
       hint: "3-digit code from your BIR 2303",
     },
     {
@@ -150,6 +152,7 @@ export const BIR_2550M_SCHEMA: FormSchema = {
       data_source: null,
       required: true,
       period_specific: true,
+      placeholder: "0.00",
     },
     {
       id: "output_tax",

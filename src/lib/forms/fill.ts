@@ -55,6 +55,7 @@ export function fillFromArchive(
     return {
       id: f.id,
       label: f.label,
+      semantic_type: f.semantic_type,
       value,
       source,
       // Direct lookup is 1.0 when we found a value, 0 when we didn't.
@@ -62,6 +63,7 @@ export function fillFromArchive(
       confidence: value ? 1 : 0,
       period_specific: f.period_specific,
       required: f.required,
+      placeholder: f.placeholder,
       hint: f.hint,
     }
   })

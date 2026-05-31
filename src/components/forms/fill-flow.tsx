@@ -12,12 +12,19 @@ import { cn } from "@/lib/utils"
 type FilledField = {
   id: string
   label: string
+  semantic_type: string
   value: string | null
   source: string | null
   confidence: number
   period_specific: boolean
   required: boolean
+  placeholder?: string
   hint?: string
+}
+
+const VAT_STATUS_LABELS: Record<string, string> = {
+  vat_registered: "VAT Registered",
+  non_vat: "Non-VAT",
 }
 
 type FillResponse = {
@@ -61,6 +68,20 @@ export function FillFlow({ formCode }: { formCode: string }) {
       active = false
     }
   }, [])
+
+  // Sync top "Period (YYYY-MM)" → the form's For the Month / For the Year fields.
+  // Fires on initial fill and whenever the user changes the period.
+  useEffect(() => {
+    if (!data) return
+    const match = period.match(/^(\d{4})-(\d{1,2})$/)
+    if (!match) return
+    const yyyy = match[1]
+    const mm = match[2].padStart(2, "0")
+    setValues((v) => {
+      if (v.period_year === yyyy && v.period_month === mm) return v
+      return { ...v, period_year: yyyy, period_month: mm }
+    })
+  }, [period, data])
 
   async function runFill(cid: string, sid: string | null = null) {
     setLoading(true)
@@ -273,6 +294,7 @@ export function FillFlow({ formCode }: { formCode: string }) {
             const v = values[f.id] ?? ""
             const filled = v.trim() !== ""
             const fromArchive = f.source && filled && (values[f.id] === (f.value ?? ""))
+            const isVatStatus = f.semantic_type === "company_vat_status"
             return (
               <div key={f.id} className="space-y-1.5">
                 <div className="flex items-center justify-between">
@@ -294,15 +316,31 @@ export function FillFlow({ formCode }: { formCode: string }) {
                     )}
                   </div>
                 </div>
-                <Input
-                  id={f.id}
-                  value={v}
-                  onChange={(e) => setVal(f.id, e.target.value)}
-                  placeholder={f.hint || ""}
-                  className={cn(
-                    !filled && f.required && "border-destructive/40 focus-visible:ring-destructive/30"
-                  )}
-                />
+                {isVatStatus ? (
+                  <select
+                    id={f.id}
+                    value={v}
+                    onChange={(e) => setVal(f.id, e.target.value)}
+                    className={cn(
+                      "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      !filled && f.required && "border-destructive/40 focus-visible:ring-destructive/30"
+                    )}
+                  >
+                    <option value="">— Not set —</option>
+                    <option value="vat_registered">{VAT_STATUS_LABELS.vat_registered}</option>
+                    <option value="non_vat">{VAT_STATUS_LABELS.non_vat}</option>
+                  </select>
+                ) : (
+                  <Input
+                    id={f.id}
+                    value={v}
+                    onChange={(e) => setVal(f.id, e.target.value)}
+                    placeholder={f.placeholder || ""}
+                    className={cn(
+                      !filled && f.required && "border-destructive/40 focus-visible:ring-destructive/30"
+                    )}
+                  />
+                )}
                 {f.hint && <p className="text-xs text-muted-foreground">{f.hint}</p>}
               </div>
             )
