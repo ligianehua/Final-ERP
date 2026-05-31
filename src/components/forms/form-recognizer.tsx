@@ -1,10 +1,13 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { FileCheck, Loader2, Upload, Sparkles, X } from "lucide-react"
+import { FileCheck, Loader2, Upload, Sparkles, X, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
+
+const FILLABLE_FORM_CODES = new Set(["BIR_2550M"])
 
 type Result = {
   form_code: string
@@ -156,6 +159,7 @@ export function FormRecognizer() {
 
 function ResultCard({ result }: { result: Result }) {
   const isUnknown = result.form_code === "UNKNOWN"
+  const isFillable = FILLABLE_FORM_CODES.has(result.form_code)
   const confidence = Math.round(result.confidence * 100)
   return (
     <Card>
@@ -204,6 +208,21 @@ function ResultCard({ result }: { result: Result }) {
         {isUnknown && (
           <p className="text-xs text-muted-foreground italic">
             Quill couldn&apos;t identify this form. Currently supports 5 forms — see list above.
+          </p>
+        )}
+        {isFillable && (
+          <div className="pt-2">
+            <Button asChild className="w-full gap-2">
+              <Link href={`/forms/fill?form_code=${result.form_code}`}>
+                Fill from archive
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+          </div>
+        )}
+        {!isUnknown && !isFillable && (
+          <p className="text-xs text-muted-foreground italic">
+            Recognized — filling support for this form is coming soon.
           </p>
         )}
       </CardContent>
