@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useRef, useState } from "react"
-import { Move, RotateCcw, Type } from "lucide-react"
+import { Loader2, Move, RotateCcw, Save, Type } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type {
   CoordSpec,
@@ -17,7 +17,7 @@ type Field = {
 
 type Props = {
   formCode: string
-  template: TemplateConfig
+  template: Omit<TemplateConfig, "transformValues">
   fields: Field[]
   values: Record<string, string>
   /** Called when the user edits a slot. `id` is the coord-map key. */
@@ -29,6 +29,10 @@ type Props = {
     id: string,
     override: { dx: number; dy: number } | null,
   ) => void
+  /** Show "Save as template default" affordance. */
+  isAdmin?: boolean
+  /** Persist current overrides as the new template default. */
+  onSaveAsTemplate?: () => Promise<{ ok: boolean; message: string }>
 }
 
 type EditMode = "values" | "layout"
@@ -80,6 +84,8 @@ export function FormEditorOverlay({
   onChange,
   overrides,
   onOverrideChange,
+  isAdmin = false,
+  onSaveAsTemplate,
 }: Props) {
   const [displayWidth] = useState(MAX_DISPLAY_WIDTH)
   const [mode, setMode] = useState<EditMode>("values")
@@ -128,6 +134,8 @@ export function FormEditorOverlay({
         onResetAll={() => {
           for (const id of Object.keys(overrides)) onOverrideChange(id, null)
         }}
+        isAdmin={isAdmin}
+        onSaveAsTemplate={onSaveAsTemplate}
       />
 
       <div className="space-y-6">
@@ -188,12 +196,31 @@ function ModeBar({
   onModeChange,
   overrideCount,
   onResetAll,
+  isAdmin,
+  onSaveAsTemplate,
 }: {
   mode: EditMode
   onModeChange: (m: EditMode) => void
   overrideCount: number
   onResetAll: () => void
+  isAdmin: boolean
+  onSaveAsTemplate?: () => Promise<{ ok: boolean; message: string }>
 }) {
+  const [saving, setSaving] = useState(false)
+  const [status, setStatus] = useState<{ ok: boolean; message: string } | null>(
+    null,
+  )
+
+  async function handleSaveAsTemplate() {
+    if (!onSaveAsTemplate) return
+    setSaving(true)
+    setStatus(null)
+    const result = await onSaveAsTemplate()
+    setSaving(false)
+    setStatus(result)
+    setTimeout(() => setStatus(null), 4000)
+  }
+
   return (
     <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/40 px-3 py-2 text-xs">
       <div className="inline-flex rounded-md border bg-background overflow-hidden">
@@ -224,6 +251,16 @@ function ModeBar({
       </div>
 
       <div className="flex items-center gap-3">
+        {status && (
+          <span
+            className={cn(
+              "transition-opacity",
+              status.ok ? "text-green-700" : "text-destructive",
+            )}
+          >
+            {status.message}
+          </span>
+        )}
         {overrideCount > 0 && (
           <>
             <span className="text-muted-foreground">
@@ -232,10 +269,27 @@ function ModeBar({
             <button
               type="button"
               onClick={onResetAll}
-              className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+              disabled={saving}
+              className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground disabled:opacity-50"
             >
               <RotateCcw className="size-3" /> Reset all
             </button>
+            {isAdmin && onSaveAsTemplate && (
+              <button
+                type="button"
+                onClick={handleSaveAsTemplate}
+                disabled={saving}
+                title="Bake current positions in as the new default for everyone"
+                className="inline-flex items-center gap-1 text-foreground hover:underline disabled:opacity-50"
+              >
+                {saving ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Save className="size-3" />
+                )}
+                Save as template default
+              </button>
+            )}
           </>
         )}
       </div>

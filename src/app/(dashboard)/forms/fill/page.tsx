@@ -2,7 +2,12 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { FillFlow, type InitialSubmission } from "@/components/forms/fill-flow"
 import { createClient } from "@/lib/db/server"
+import { isAdminEmail } from "@/lib/auth/admin"
 import { getFormSchema } from "@/lib/forms/registry"
+import {
+  getEffectiveTemplate,
+  serializeTemplate,
+} from "@/lib/forms/templates/effective"
 import { notFound } from "next/navigation"
 
 type SearchParams = {
@@ -21,9 +26,17 @@ export default async function FillFormPage({
   const schema = getFormSchema(form_code)
   if (!schema) notFound()
 
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const isAdmin = isAdminEmail(user?.email)
+
+  // Effective coord-map: DB override if an admin has saved one, else
+  // the factory default from src/lib/forms/templates/<form>.ts.
+  const effective = await getEffectiveTemplate(form_code)
+  const template = effective ? serializeTemplate(effective) : null
+
   let initial: InitialSubmission | undefined
   if (submission_id) {
-    const supabase = await createClient()
     const { data } = await supabase
       .from("form_submissions")
       .select("id, company_id, period, field_values, field_overrides")
@@ -70,7 +83,12 @@ export default async function FillFormPage({
         </p>
       </div>
 
-      <FillFlow formCode={form_code} initial={initial} />
+      <FillFlow
+        formCode={form_code}
+        template={template}
+        isAdmin={isAdmin}
+        initial={initial}
+      />
     </div>
   )
 }

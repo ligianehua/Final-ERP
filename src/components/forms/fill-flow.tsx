@@ -8,9 +8,15 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { CheckCircle2, AlertCircle, Loader2, Save, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { getTemplateConfig } from "@/lib/forms/templates"
 import { FormEditorOverlay } from "./form-editor-overlay"
-import type { FieldOverrides } from "@/lib/forms/template-types"
+import type {
+  CoordSpec,
+  FieldOverrides,
+  TemplateConfig,
+} from "@/lib/forms/template-types"
+
+type SerializableTemplate = Omit<TemplateConfig, "transformValues">
+
 
 type FilledField = {
   id: string
@@ -50,9 +56,13 @@ export type InitialSubmission = {
 
 export function FillFlow({
   formCode,
+  template,
+  isAdmin,
   initial,
 }: {
   formCode: string
+  template: SerializableTemplate | null
+  isAdmin: boolean
   initial?: InitialSubmission
 }) {
   const router = useRouter()
@@ -163,6 +173,36 @@ export function FillFlow({
       }
       return { ...s, [id]: next }
     })
+  }
+
+  // Admin only: bake the current overrides into the template as the new
+  // default for everyone, then clear them locally. Returns a status
+  // message rendered by the editor.
+  async function saveAsTemplate(): Promise<{ ok: boolean; message: string }> {
+    if (!template || template.mapping.strategy !== "coordinates") {
+      return { ok: false, message: "Template not editable" }
+    }
+    if (Object.keys(overrides).length === 0) {
+      return { ok: false, message: "Nothing to save — drag a field first" }
+    }
+    const merged: Record<string, CoordSpec> = {}
+    for (const [id, spec] of Object.entries(template.mapping.fields)) {
+      const o = overrides[id]
+      merged[id] = o ? { ...spec, x: spec.x + o.dx, y: spec.y + o.dy } : spec
+    }
+    const res = await fetch(`/api/forms/templates/${formCode}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ field_mapping: merged }),
+    })
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}))
+      return { ok: false, message: json.error || "Save failed" }
+    }
+    // Wipe locally — they're now baked into the next page-render's template.
+    setOverrides({})
+    router.refresh()
+    return { ok: true, message: "Saved as new default" }
   }
 
   async function changeSignatory(newId: string) {
@@ -347,7 +387,6 @@ export function FillFlow({
       </Card>
 
       {(() => {
-        const template = getTemplateConfig(formCode)
         const useVisualEditor =
           template && template.mapping.strategy === "coordinates"
 
@@ -393,6 +432,8 @@ export function FillFlow({
                     onChange={setVal}
                     overrides={overrides}
                     onOverrideChange={setOverride}
+                    isAdmin={isAdmin}
+                    onSaveAsTemplate={saveAsTemplate}
                   />
                 </CardContent>
               </Card>

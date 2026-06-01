@@ -6,7 +6,7 @@ import {
   rgb,
 } from "pdf-lib"
 import { renderOnTemplate } from "./render-on-template"
-import { getTemplateConfig } from "./templates"
+import { getEffectiveTemplate } from "./templates/effective"
 import type { FieldOverrides } from "./template-types"
 import type { FormSchema } from "./types"
 
@@ -137,7 +137,7 @@ export type GeneratePDFInput = {
 export async function generateFormPDF(
   input: GeneratePDFInput,
 ): Promise<Uint8Array> {
-  const template = getTemplateConfig(input.schema.form_code)
+  const template = await getEffectiveTemplate(input.schema.form_code)
   if (template) {
     return renderOnTemplate({
       template,
