@@ -40,18 +40,37 @@ type FillResponse = {
 
 type CompanyOption = { id: string; name: string; entity_type: string }
 
-export function FillFlow({ formCode }: { formCode: string }) {
+export type InitialSubmission = {
+  id: string
+  companyId: string
+  period: string
+  values: Record<string, string>
+  overrides: FieldOverrides
+}
+
+export function FillFlow({
+  formCode,
+  initial,
+}: {
+  formCode: string
+  initial?: InitialSubmission
+}) {
   const router = useRouter()
   const [companies, setCompanies] = useState<CompanyOption[] | null>(null)
-  const [companyId, setCompanyId] = useState<string>("")
+  const [companyId, setCompanyId] = useState<string>(initial?.companyId ?? "")
   const [signatoryId, setSignatoryId] = useState<string | null>(null)
   const [data, setData] = useState<FillResponse | null>(null)
-  const [values, setValues] = useState<Record<string, string>>({})
-  const [overrides, setOverrides] = useState<FieldOverrides>({})
+  const [values, setValues] = useState<Record<string, string>>(
+    initial?.values ?? {},
+  )
+  const [overrides, setOverrides] = useState<FieldOverrides>(
+    initial?.overrides ?? {},
+  )
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [period, setPeriod] = useState<string>(() => {
+    if (initial?.period) return initial.period
     // Default to previous month (typical filing window)
     const d = new Date()
     d.setMonth(d.getMonth() - 1)
@@ -73,6 +92,15 @@ export function FillFlow({ formCode }: { formCode: string }) {
     }
   }, [])
 
+  // Edit mode: load form meta on mount, preserve our saved values.
+  useEffect(() => {
+    if (!initial) return
+    runFill(initial.companyId, null, initial.values)
+    // initial is stable for the lifetime of this mount; deps intentionally
+    // empty so we only seed once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Sync top "Period (YYYY-MM)" → the form's For the Month / For the Year fields.
   // Fires on initial fill and whenever the user changes the period.
   useEffect(() => {
@@ -87,7 +115,11 @@ export function FillFlow({ formCode }: { formCode: string }) {
     })
   }, [period, data])
 
-  async function runFill(cid: string, sid: string | null = null) {
+  async function runFill(
+    cid: string,
+    sid: string | null = null,
+    preserveValues: Record<string, string> | null = null,
+  ) {
     setLoading(true)
     setError(null)
     setData(null)
@@ -104,11 +136,15 @@ export function FillFlow({ formCode }: { formCode: string }) {
     }
     setData(json)
     setSignatoryId(json.signatory_id)
-    const init: Record<string, string> = {}
-    for (const f of json.fields as FilledField[]) {
-      init[f.id] = f.value ?? ""
+    if (preserveValues) {
+      setValues(preserveValues)
+    } else {
+      const init: Record<string, string> = {}
+      for (const f of json.fields as FilledField[]) {
+        init[f.id] = f.value ?? ""
+      }
+      setValues(init)
     }
-    setValues(init)
     setLoading(false)
   }
 
@@ -144,16 +180,23 @@ export function FillFlow({ formCode }: { formCode: string }) {
       field_values[k] = v.trim() === "" ? null : v
     }
 
-    const res = await fetch("/api/submissions", {
-      method: "POST",
+    const editing = !!initial
+    const url = editing ? `/api/submissions/${initial.id}` : "/api/submissions"
+    const method = editing ? "PATCH" : "POST"
+    const body = editing
+      ? { period, field_values, field_overrides: overrides }
+      : {
+          form_code: formCode,
+          company_id: data.company.id,
+          period,
+          field_values,
+          field_overrides: overrides,
+        }
+
+    const res = await fetch(url, {
+      method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        form_code: formCode,
-        company_id: data.company.id,
-        period,
-        field_values,
-        field_overrides: overrides,
-      }),
+      body: JSON.stringify(body),
     })
     const json = await res.json().catch(() => ({}))
     if (!res.ok) {
@@ -163,6 +206,7 @@ export function FillFlow({ formCode }: { formCode: string }) {
     }
     setSaving(false)
     router.push("/submissions")
+    router.refresh()
   }
 
   const summary = useMemo(() => {
@@ -449,12 +493,23 @@ export function FillFlow({ formCode }: { formCode: string }) {
       )}
 
       <div className="flex justify-end gap-2">
-        <Button variant="outline" onClick={() => setData(null)} disabled={saving}>
-          Start over
-        </Button>
+        {!initial && (
+          <Button variant="outline" onClick={() => setData(null)} disabled={saving}>
+            Start over
+          </Button>
+        )}
+        {initial && (
+          <Button
+            variant="outline"
+            onClick={() => router.push("/submissions")}
+            disabled={saving}
+          >
+            Cancel
+          </Button>
+        )}
         <Button onClick={saveDraft} disabled={saving} className="gap-2">
           {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-          Save draft
+          {initial ? "Update draft" : "Save draft"}
         </Button>
       </div>
     </div>

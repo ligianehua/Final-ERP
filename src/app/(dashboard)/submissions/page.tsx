@@ -91,6 +91,8 @@ export default async function SubmissionsPage() {
                 {schema && (
                   <SubmissionActions
                     submissionId={s.id}
+                    formCode={s.form_code}
+                    formName={formName}
                     outputPdfPath={s.output_pdf_path}
                   />
                 )}

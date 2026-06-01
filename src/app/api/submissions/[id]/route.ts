@@ -67,7 +67,22 @@ export async function DELETE(_request: Request, { params }: Params) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+  // Find the generated PDF (if any) so we can clean it up after the row goes.
+  const { data: existing } = await supabase
+    .from("form_submissions")
+    .select("output_pdf_path")
+    .eq("id", id)
+    .single()
+
   const { error } = await supabase.from("form_submissions").delete().eq("id", id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  if (existing?.output_pdf_path) {
+    // Best-effort cleanup — orphaning a PDF isn't a hard failure.
+    await supabase.storage
+      .from("documents")
+      .remove([existing.output_pdf_path as string])
+      .catch(() => {})
+  }
   return NextResponse.json({ success: true })
 }
