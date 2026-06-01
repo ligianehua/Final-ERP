@@ -18,21 +18,22 @@ const PAGE_H = 1008
 const fromTop = (yTop) => PAGE_H - yTop
 
 // MUST mirror src/lib/forms/templates/bir-2550m.ts
+// Heights omitted — renderer defaults to size+2.
 const COORDS = {
-  period_display: { page: 1, x: 175, y: fromTop(82), width: 100, height: 14, size: 10 },
-  tin: { page: 1, x: 45, y: fromTop(120), width: 170, height: 14, size: 11 },
-  rdo_code: { page: 1, x: 235, y: fromTop(120), width: 70, height: 14, size: 11 },
-  line_of_business: { page: 1, x: 335, y: fromTop(120), width: 240, height: 14, size: 9 },
-  registered_name: { page: 1, x: 35, y: fromTop(143), width: 420, height: 14, size: 11 },
-  telephone: { page: 1, x: 465, y: fromTop(143), width: 115, height: 14, size: 10 },
-  registered_address: { page: 1, x: 35, y: fromTop(168), width: 420, height: 14, size: 10 },
-  gross_sales: { page: 1, x: 430, y: fromTop(222), width: 140, height: 14, size: 10, align: "right" },
-  output_tax: { page: 1, x: 585, y: fromTop(222), width: 130, height: 14, size: 10, align: "right" },
-  input_tax: { page: 1, x: 585, y: fromTop(453), width: 130, height: 14, size: 10, align: "right" },
-  vat_payable: { page: 1, x: 585, y: fromTop(685), width: 130, height: 14, size: 10, align: "right" },
-  signatory_name: { page: 1, x: 70, y: fromTop(730), width: 230, height: 14, size: 10 },
-  signatory_position: { page: 1, x: 70, y: fromTop(778), width: 150, height: 14, size: 9 },
-  signatory_tin: { page: 1, x: 220, y: fromTop(778), width: 120, height: 14, size: 9 },
+  period_display:     { page: 1, x: 175, y: fromTop(82),  width: 100, size: 10 },
+  tin:                { page: 1, x: 45,  y: fromTop(120), width: 170, size: 11 },
+  rdo_code:           { page: 1, x: 235, y: fromTop(120), width: 70,  size: 11 },
+  line_of_business:   { page: 1, x: 335, y: fromTop(120), width: 240, size: 9 },
+  registered_name:    { page: 1, x: 35,  y: fromTop(143), width: 420, size: 11 },
+  telephone:          { page: 1, x: 465, y: fromTop(143), width: 115, size: 10 },
+  registered_address: { page: 1, x: 35,  y: fromTop(168), width: 420, size: 10 },
+  gross_sales:        { page: 1, x: 430, y: fromTop(222), width: 140, size: 10, align: "right" },
+  output_tax:         { page: 1, x: 585, y: fromTop(222), width: 130, size: 10, align: "right" },
+  input_tax:          { page: 1, x: 585, y: fromTop(453), width: 130, size: 10, align: "right" },
+  vat_payable:        { page: 1, x: 585, y: fromTop(685), width: 130, size: 10, align: "right" },
+  signatory_name:     { page: 1, x: 70,  y: fromTop(730), width: 230, size: 10 },
+  signatory_position: { page: 1, x: 70,  y: fromTop(778), width: 150, size: 9 },
+  signatory_tin:      { page: 1, x: 220, y: fromTop(778), width: 120, size: 9 },
 }
 
 const SAMPLE = {
@@ -64,11 +65,11 @@ for (const [key, spec] of Object.entries(COORDS)) {
   const raw = SAMPLE[key] ?? ""
   const size = spec.size ?? 10
   const width = spec.width ?? 100
-  const height = spec.height ?? size + 4
+  const height = spec.height ?? size + 2
   let boxX = spec.x
   if (spec.align === "right") boxX = spec.x - width
   else if (spec.align === "center") boxX = spec.x - width / 2
-  const boxY = spec.y - 2
+  const boxY = spec.y - 1
 
   const field = form.createTextField(`quill.${key}`)
   field.setText(raw)

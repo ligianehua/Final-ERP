@@ -39,83 +39,41 @@ export const BIR_2550M_TEMPLATE: TemplateConfig = {
   mapping: {
     strategy: "coordinates",
     fields: {
+      // Heights default to `size + 2` in the renderer; we omit them here
+      // so all fields stay vertically tight.
+
       // Item 1: For the Month of (MM/YYYY)
-      period_display: {
-        page: 1, x: 175, y: fromTop(82),
-        width: 100, height: 14, size: 10,
-      },
+      period_display: { page: 1, x: 175, y: fromTop(82), width: 100, size: 10 },
 
       // Item 4: TIN  (label top at y≈100; input row below)
-      tin: {
-        page: 1, x: 45, y: fromTop(120),
-        width: 170, height: 14, size: 11,
-      },
+      tin:              { page: 1, x: 45,  y: fromTop(120), width: 170, size: 11 },
       // Item 5: RDO Code
-      rdo_code: {
-        page: 1, x: 235, y: fromTop(120),
-        width: 70, height: 14, size: 11,
-      },
+      rdo_code:         { page: 1, x: 235, y: fromTop(120), width: 70,  size: 11 },
       // Item 6: Line of Business
-      line_of_business: {
-        page: 1, x: 335, y: fromTop(120),
-        width: 240, height: 14, size: 9,
-      },
+      line_of_business: { page: 1, x: 335, y: fromTop(120), width: 240, size: 9 },
 
       // Item 7: Taxpayer's Name
-      registered_name: {
-        page: 1, x: 35, y: fromTop(143),
-        width: 420, height: 14, size: 11,
-      },
+      registered_name: { page: 1, x: 35,  y: fromTop(143), width: 420, size: 11 },
       // Item 8: Telephone Number
-      telephone: {
-        page: 1, x: 465, y: fromTop(143),
-        width: 115, height: 14, size: 10,
-      },
+      telephone:       { page: 1, x: 465, y: fromTop(143), width: 115, size: 10 },
 
       // Item 9: Registered Address
-      registered_address: {
-        page: 1, x: 35, y: fromTop(168),
-        width: 420, height: 14, size: 10,
-      },
+      registered_address: { page: 1, x: 35, y: fromTop(168), width: 420, size: 10 },
 
       // Item 12A/B: Vatable Sales | Output Tax (column right edges)
-      gross_sales: {
-        page: 1, x: 430, y: fromTop(222),
-        width: 140, height: 14, size: 10, align: "right",
-      },
-      output_tax: {
-        page: 1, x: 585, y: fromTop(222),
-        width: 130, height: 14, size: 10, align: "right",
-      },
+      gross_sales: { page: 1, x: 430, y: fromTop(222), width: 140, size: 10, align: "right" },
+      output_tax:  { page: 1, x: 585, y: fromTop(222), width: 130, size: 10, align: "right" },
 
       // Item 19: Total Available Input Tax (right column)
-      input_tax: {
-        page: 1, x: 585, y: fromTop(453),
-        width: 130, height: 14, size: 10, align: "right",
-      },
+      input_tax: { page: 1, x: 585, y: fromTop(453), width: 130, size: 10, align: "right" },
 
       // Item 26: Tax Still Payable / Net VAT Payable
-      vat_payable: {
-        page: 1, x: 585, y: fromTop(685),
-        width: 130, height: 14, size: 10, align: "right",
-      },
+      vat_payable: { page: 1, x: 585, y: fromTop(685), width: 130, size: 10, align: "right" },
 
       // Signatory block (left column — Taxpayer / Authorized Rep)
-      // Printed name above the "Signature Over Printed Name" caption.
-      signatory_name: {
-        page: 1, x: 70, y: fromTop(730),
-        width: 230, height: 14, size: 10,
-      },
-      // Below "Title/Position of Signatory" caption.
-      signatory_position: {
-        page: 1, x: 70, y: fromTop(778),
-        width: 150, height: 14, size: 9,
-      },
-      // Below "TIN of Signatory" caption — center sub-column.
-      signatory_tin: {
-        page: 1, x: 220, y: fromTop(778),
-        width: 120, height: 14, size: 9,
-      },
+      signatory_name:     { page: 1, x: 70,  y: fromTop(730), width: 230, size: 10 },
+      signatory_position: { page: 1, x: 70,  y: fromTop(778), width: 150, size: 9 },
+      signatory_tin:      { page: 1, x: 220, y: fromTop(778), width: 120, size: 9 },
     },
   },
 }

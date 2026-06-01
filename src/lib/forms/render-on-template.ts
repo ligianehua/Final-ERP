@@ -155,7 +155,9 @@ async function fillByCoordinates(
 
     const size = spec.size ?? 10
     const width = spec.width ?? spec.maxWidth ?? 100
-    const height = spec.height ?? size + 4
+    // Box hugs the text tightly so the viewer-added focus highlight
+    // doesn't bleed onto the next row of the printed form.
+    const height = spec.height ?? size + 2
 
     // Anchor: spec.x is the LEFT edge for left-align, RIGHT edge for
     // right-align, CENTER for center-align.
@@ -163,8 +165,8 @@ async function fillByCoordinates(
     if (spec.align === "right") boxX = spec.x - width
     else if (spec.align === "center") boxX = spec.x - width / 2
 
-    // Convert text baseline → field-box bottom (descender margin ≈ 2pt).
-    const boxY = spec.y - 2
+    // Convert text baseline → field-box bottom (1pt descender margin).
+    const boxY = spec.y - 1
 
     const raw = values[fieldId]
     const text = raw ? sanitize(raw) : ""
