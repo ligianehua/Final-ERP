@@ -122,3 +122,36 @@
 ### Next
 - Test extraction on a real BIR 2303 image
 - Day 4-7 plan: preview, filter, people roster, demo
+
+---
+
+## Week 6 Mid — 2026-06-01 — Multi-format → PDF conversion
+
+### Why
+Forcing customers to convert XLS/DOC into PDF before upload is bad UX. The
+server should accept whatever they have. Same pipeline also bakes our
+own system-shipped templates (starting with BIR 2550M).
+
+### Done
+- `src/lib/convert/supported.ts` — extension whitelist (Office docs,
+  spreadsheets, presentations, plain text, HTML, JPG/PNG, passthrough PDF)
+- `src/lib/convert/to-pdf.ts` — Office → `soffice --headless`, images →
+  pdf-lib single-page A4, PDF → passthrough; per-call temp dir +
+  isolated LibreOffice user profile (no concurrency lock collisions)
+- `POST /api/convert/to-pdf` — auth-gated multipart endpoint, 25 MB cap,
+  90 s timeout, `runtime = "nodejs"`
+- `scripts/convert-template.mjs` — dev-time tool for baking system
+  templates; produced `public/form-templates/BIR_2550M.pdf` (6 pages,
+  PDF-1.7) from the official BIR XLS
+- `docs/DECISIONS.md` — entry on why LibreOffice over Gotenberg / cloud
+  conversion APIs + the production-image requirement
+
+### Deployment note
+Routes that use this lib need a host where the runtime image carries
+`libreoffice-calc` + `libreoffice-writer`. Plain Vercel won't fit; a
+Docker target (Fly.io / Railway / self-hosted) does.
+
+### Next
+- Wire the endpoint into a template-upload UI for admins (deferred —
+  separate ticket)
+- Continue Week 6 form-fill polish on top of the now-canonical BIR PDF

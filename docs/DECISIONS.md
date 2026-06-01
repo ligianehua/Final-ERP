@@ -46,3 +46,31 @@
 ### pnpm
 - Faster installs, strict dependency isolation
 - Workspace-compatible for future monorepo if needed
+
+---
+
+## 2026-06 — Document-to-PDF conversion
+
+### LibreOffice headless (in-container)
+- Customers upload templates in whatever format they have (XLS, DOC, DOCX,
+  ODT, RTF, PPT, image scans, …). The server normalises everything to PDF
+  before downstream fill/render code touches it.
+- `soffice --headless --convert-to pdf` covers 30+ input formats with one
+  binary. Free, battle-tested, no per-request API cost.
+- Rejected alternatives:
+  - **Gotenberg microservice** — equivalent capability, but adds an extra
+    deployable service. Single-tenant ERP doesn't need the separation.
+  - **CloudConvert / Aspose / etc.** — per-file pricing, customer data
+    leaves our infrastructure.
+  - **Pure-JS libraries (mammoth, xlsx → render)** — quality is uneven on
+    complex government forms with merged cells and embedded shapes.
+- **Deployment requirement**: production image must include
+  `libreoffice-calc`, `libreoffice-writer`, `libreoffice-impress` (Draw is
+  pulled in transitively). Vercel's serverless bundle limit makes a Docker
+  target (Railway / Fly.io / self-hosted) the path of least resistance for
+  this route — other routes can still ship to Vercel if we split later.
+
+### pdf-lib for image-only inputs
+- For JPG/PNG (typically photographed scans), we wrap the image in a
+  single-page PDF directly with pdf-lib instead of routing through
+  LibreOffice. Faster, no temp files, and pdf-lib is already a dependency.
