@@ -1,24 +1,43 @@
-import { PDFDocument, PDFFont, StandardFonts } from "pdf-lib"
+import {
+  PDFDocument,
+  PDFFont,
+  StandardFonts,
+  TextAlignment,
+} from "pdf-lib"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 
 /**
- * Where (and how) to draw a single value on a coordinate-mapped PDF.
+ * Where (and how) to place a single value on a coordinate-mapped PDF.
  *
  * pdf-lib uses a bottom-left origin: y grows upward. Coordinates are in
  * PDF points (1 pt = 1/72 inch). For US Legal pages, the page is
  * 612 wide × 1008 tall.
+ *
+ * `y` is the BASELINE the text sits on (matches `drawText` semantics).
+ * For AcroForm output, we offset the field box down by a small descender
+ * margin so the visible text lines up with the same baseline.
+ *
+ * `width` / `height` are also used by the in-browser WYSIWYG editor to
+ * size the HTML input overlays; keep them filled in for both reasons.
  */
 export type CoordSpec = {
   /** 1-indexed page number. */
   page: number
   x: number
   y: number
+  /** Width of the input box. Defaults to `maxWidth` ?? 100. */
+  width?: number
+  /** Height of the input box. Defaults to `size + 4`. */
+  height?: number
   /** Font size in points. Defaults to 10. */
   size?: number
   /** Horizontal anchor for `x`. Defaults to "left". */
   align?: "left" | "right" | "center"
-  /** If set, text is truncated with "…" once it exceeds this width. */
+  /**
+   * Optional cap for visible text width. Used as the default `width`
+   * if width is absent. Affects truncation in flat-draw mode only.
+   */
   maxWidth?: number
 }
 
@@ -111,39 +130,67 @@ async function fillByAcroForm(
       // and per-template overrides are future work; skip silently for now.
     }
   }
-  form.flatten()
+  // Intentionally NOT flattening — leave fields editable post-download.
   return pdf.save()
 }
 
+/**
+ * Coordinate-mapped templates emit real AcroForm text fields at each
+ * mapped position, pre-filled with the value (or empty if no value).
+ * That way the downloaded PDF stays editable in Reader / Preview / browser.
+ */
 async function fillByCoordinates(
   pdf: PDFDocument,
   mapping: Record<string, CoordSpec>,
   values: Record<string, string | null>,
 ): Promise<Uint8Array> {
+  const form = pdf.getForm()
   const font = await pdf.embedFont(StandardFonts.Helvetica)
   const pages = pdf.getPages()
 
-  for (const [schemaId, spec] of Object.entries(mapping)) {
-    const raw = values[schemaId]
-    if (!raw) continue
-
+  for (const [fieldId, spec] of Object.entries(mapping)) {
     const pageIdx = spec.page - 1
     if (pageIdx < 0 || pageIdx >= pages.length) continue
     const page = pages[pageIdx]
 
     const size = spec.size ?? 10
-    let text = sanitize(raw)
-    if (spec.maxWidth) text = truncate(text, font, size, spec.maxWidth)
+    const width = spec.width ?? spec.maxWidth ?? 100
+    const height = spec.height ?? size + 4
 
-    let drawX = spec.x
-    if (spec.align === "right") {
-      drawX -= font.widthOfTextAtSize(text, size)
-    } else if (spec.align === "center") {
-      drawX -= font.widthOfTextAtSize(text, size) / 2
-    }
+    // Anchor: spec.x is the LEFT edge for left-align, RIGHT edge for
+    // right-align, CENTER for center-align.
+    let boxX = spec.x
+    if (spec.align === "right") boxX = spec.x - width
+    else if (spec.align === "center") boxX = spec.x - width / 2
 
-    page.drawText(text, { x: drawX, y: spec.y, font, size })
+    // Convert text baseline → field-box bottom (descender margin ≈ 2pt).
+    const boxY = spec.y - 2
+
+    const raw = values[fieldId]
+    const text = raw ? sanitize(raw) : ""
+
+    // Names must be unique within the form; prefix to avoid collisions
+    // with whatever existing form fields a hand-crafted PDF might have.
+    const field = form.createTextField(`quill.${fieldId}`)
+    field.setText(text)
+    if (spec.align === "right") field.setAlignment(TextAlignment.Right)
+    else if (spec.align === "center") field.setAlignment(TextAlignment.Center)
+
+    field.addToPage(page, {
+      x: boxX,
+      y: boxY,
+      width,
+      height,
+      font,
+      borderWidth: 0, // invisible until focused
+    })
+    // /DA entry is only populated by addToPage; setFontSize must follow it.
+    field.setFontSize(size)
   }
 
+  // Don't flatten — user can re-edit after download.
   return pdf.save()
 }
+
+// Re-export so coord-map files can stay decoupled from the renderer file.
+export { truncate, sanitize }

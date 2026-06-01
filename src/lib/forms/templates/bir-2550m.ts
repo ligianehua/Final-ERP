@@ -4,10 +4,14 @@ import type { TemplateConfig } from "../render-on-template"
  * Coordinate map for the official BIR 2550M PDF
  * (`public/form-templates/BIR_2550M.pdf`, US Legal 612 × 1008 pt, 5 pages).
  *
- * No AcroForm fields in this PDF — text is drawn directly on the page at
- * the positions below. Source positions come from
- * `pdftotext -bbox-layout` on the template, then offset by hand to line up
- * with the input boxes drawn under the official labels.
+ * No AcroForm fields in this PDF — we synthesise text fields at the
+ * positions below. Source positions come from `pdftotext -bbox-layout`
+ * on the template, then offset by hand to line up with the input boxes
+ * drawn under the official labels.
+ *
+ * Widths matter twice: pdf-lib uses them to size the AcroForm box drawn
+ * on the PDF, and the in-browser editor (Phase 2) will use the same
+ * values to size HTML input overlays.
  *
  * Schema fields without a natural spot on the official form are
  * intentionally omitted:
@@ -15,9 +19,6 @@ import type { TemplateConfig } from "../render-on-template"
  *   - `city`        — folded into the Registered Address row
  *   - `email`       — not collected on this form
  *   - `vat_status`  — implicit (the whole form IS the VAT return)
- *
- * The signatory block (page 1, items 27/28) only has a single column
- * for the taxpayer; we fill the left column.
  */
 
 const PAGE_H = 1008
@@ -28,7 +29,6 @@ const fromTop = (yTop: number) => PAGE_H - yTop
 export const BIR_2550M_TEMPLATE: TemplateConfig = {
   pdf_path: "public/form-templates/BIR_2550M.pdf",
   transformValues: (values) => {
-    // Item 1 "For the Month of (MM/YYYY)" is a single input slot.
     const month = values.period_month?.padStart(2, "0")
     const year = values.period_year
     return {
@@ -40,104 +40,81 @@ export const BIR_2550M_TEMPLATE: TemplateConfig = {
     strategy: "coordinates",
     fields: {
       // Item 1: For the Month of (MM/YYYY)
-      period_display: { page: 1, x: 175, y: fromTop(82), size: 10 },
+      period_display: {
+        page: 1, x: 175, y: fromTop(82),
+        width: 100, height: 14, size: 10,
+      },
 
-      // Item 4: TIN  (label at 30,100 → input below)
-      tin: { page: 1, x: 60, y: fromTop(120), size: 11 },
-      // Item 5: RDO Code  (label at 230,100)
-      rdo_code: { page: 1, x: 240, y: fromTop(120), size: 11 },
-      // Item 6: Line of Business  (label at 330,100)
+      // Item 4: TIN  (label top at y≈100; input row below)
+      tin: {
+        page: 1, x: 45, y: fromTop(120),
+        width: 170, height: 14, size: 11,
+      },
+      // Item 5: RDO Code
+      rdo_code: {
+        page: 1, x: 235, y: fromTop(120),
+        width: 70, height: 14, size: 11,
+      },
+      // Item 6: Line of Business
       line_of_business: {
-        page: 1,
-        x: 340,
-        y: fromTop(120),
-        size: 9,
-        maxWidth: 200,
+        page: 1, x: 335, y: fromTop(120),
+        width: 240, height: 14, size: 9,
       },
 
-      // Item 7: Taxpayer's Name  (label at 30,123)
+      // Item 7: Taxpayer's Name
       registered_name: {
-        page: 1,
-        x: 40,
-        y: fromTop(143),
-        size: 11,
-        maxWidth: 410,
+        page: 1, x: 35, y: fromTop(143),
+        width: 420, height: 14, size: 11,
       },
-      // Item 8: Telephone Number  (label at 462,120)
+      // Item 8: Telephone Number
       telephone: {
-        page: 1,
-        x: 470,
-        y: fromTop(143),
-        size: 10,
-        maxWidth: 110,
+        page: 1, x: 465, y: fromTop(143),
+        width: 115, height: 14, size: 10,
       },
 
-      // Item 9: Registered Address  (label at 30,146)
+      // Item 9: Registered Address
       registered_address: {
-        page: 1,
-        x: 40,
-        y: fromTop(168),
-        size: 10,
-        maxWidth: 410,
+        page: 1, x: 35, y: fromTop(168),
+        width: 420, height: 14, size: 10,
       },
 
-      // Item 12A/B: Vatable Sales / Output Tax  (row label tops at y=214)
+      // Item 12A/B: Vatable Sales | Output Tax (column right edges)
       gross_sales: {
-        page: 1,
-        x: 425,
-        y: fromTop(222),
-        size: 10,
-        align: "right",
+        page: 1, x: 430, y: fromTop(222),
+        width: 140, height: 14, size: 10, align: "right",
       },
       output_tax: {
-        page: 1,
-        x: 570,
-        y: fromTop(222),
-        size: 10,
-        align: "right",
+        page: 1, x: 585, y: fromTop(222),
+        width: 130, height: 14, size: 10, align: "right",
       },
 
-      // Item 19: Total Available Input Tax  (label at 30,445 — right column)
+      // Item 19: Total Available Input Tax (right column)
       input_tax: {
-        page: 1,
-        x: 570,
-        y: fromTop(453),
-        size: 10,
-        align: "right",
+        page: 1, x: 585, y: fromTop(453),
+        width: 130, height: 14, size: 10, align: "right",
       },
 
-      // Item 26: Tax Still Payable / Net VAT Payable  (label at 30,676)
+      // Item 26: Tax Still Payable / Net VAT Payable
       vat_payable: {
-        page: 1,
-        x: 570,
-        y: fromTop(685),
-        size: 10,
-        align: "right",
+        page: 1, x: 585, y: fromTop(685),
+        width: 130, height: 14, size: 10, align: "right",
       },
 
-      // Signatory block — left column (Taxpayer / Authorized Representative)
-      // Printed name above the "Signature Over Printed Name" caption (y≈732).
+      // Signatory block (left column — Taxpayer / Authorized Rep)
+      // Printed name above the "Signature Over Printed Name" caption.
       signatory_name: {
-        page: 1,
-        x: 80,
-        y: fromTop(730),
-        size: 10,
-        maxWidth: 220,
+        page: 1, x: 70, y: fromTop(730),
+        width: 230, height: 14, size: 10,
       },
-      // Below "Title/Position of Signatory" caption (y≈765).
+      // Below "Title/Position of Signatory" caption.
       signatory_position: {
-        page: 1,
-        x: 80,
-        y: fromTop(778),
-        size: 9,
-        maxWidth: 140,
+        page: 1, x: 70, y: fromTop(778),
+        width: 150, height: 14, size: 9,
       },
-      // Below "TIN of Signatory" caption — center column of the left half.
+      // Below "TIN of Signatory" caption — center sub-column.
       signatory_tin: {
-        page: 1,
-        x: 220,
-        y: fromTop(778),
-        size: 9,
+        page: 1, x: 220, y: fromTop(778),
+        width: 120, height: 14, size: 9,
       },
     },
   },
