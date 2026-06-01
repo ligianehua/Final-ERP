@@ -10,6 +10,7 @@ import type {
   AcroFormMapping,
   CoordSpec,
   CoordinateMapping,
+  FieldOverrides,
   TemplateConfig,
   TemplateDimensions,
 } from "./template-types"
@@ -20,6 +21,7 @@ export type {
   AcroFormMapping,
   CoordSpec,
   CoordinateMapping,
+  FieldOverrides,
   TemplateConfig,
   TemplateDimensions,
 }
@@ -27,6 +29,8 @@ export type {
 export type RenderInput = {
   template: TemplateConfig
   values: Record<string, string | null>
+  /** Per-submission drag adjustments applied on top of the template. */
+  overrides?: FieldOverrides
 }
 
 /**
@@ -57,6 +61,7 @@ function truncate(text: string, font: PDFFont, size: number, max: number): strin
 export async function renderOnTemplate({
   template,
   values,
+  overrides = {},
 }: RenderInput): Promise<Uint8Array> {
   const bytes = await readFile(join(process.cwd(), template.pdf_path))
   const pdf = await PDFDocument.load(bytes)
@@ -69,7 +74,20 @@ export async function renderOnTemplate({
   if (template.mapping.strategy === "acroform") {
     return fillByAcroForm(pdf, template.mapping.fields, finalValues)
   }
-  return fillByCoordinates(pdf, template.mapping.fields, finalValues)
+  const adjusted = applyOverrides(template.mapping.fields, overrides)
+  return fillByCoordinates(pdf, adjusted, finalValues)
+}
+
+function applyOverrides(
+  base: Record<string, CoordSpec>,
+  overrides: FieldOverrides,
+): Record<string, CoordSpec> {
+  const out: Record<string, CoordSpec> = {}
+  for (const [id, spec] of Object.entries(base)) {
+    const o = overrides[id]
+    out[id] = o ? { ...spec, x: spec.x + o.dx, y: spec.y + o.dy } : spec
+  }
+  return out
 }
 
 async function fillByAcroForm(

@@ -3,11 +3,17 @@ import { z } from "zod"
 import { createClient } from "@/lib/db/server"
 import { getFormSchema } from "@/lib/forms/registry"
 
+const overrideSchema = z.object({
+  dx: z.number().finite(),
+  dy: z.number().finite(),
+})
+
 const createSchema = z.object({
   form_code: z.string().min(1),
   company_id: z.string().uuid(),
   period: z.string().max(20).nullable().optional(),
   field_values: z.record(z.string(), z.string().nullable()),
+  field_overrides: z.record(z.string(), overrideSchema).optional(),
 })
 
 // GET /api/submissions — list all submissions for the current user
@@ -70,6 +76,7 @@ export async function POST(request: Request) {
       form_code: parsed.data.form_code,
       period: parsed.data.period ?? null,
       field_values: parsed.data.field_values,
+      field_overrides: parsed.data.field_overrides ?? {},
       status: "draft",
     })
     .select()

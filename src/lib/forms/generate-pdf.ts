@@ -7,6 +7,7 @@ import {
 } from "pdf-lib"
 import { renderOnTemplate } from "./render-on-template"
 import { getTemplateConfig } from "./templates"
+import type { FieldOverrides } from "./template-types"
 import type { FormSchema } from "./types"
 
 /**
@@ -123,6 +124,8 @@ export type GeneratePDFInput = {
   values: Record<string, string | null>
   companyName: string
   period: string | null
+  /** Per-submission drag overrides for templated forms. */
+  overrides?: FieldOverrides
 }
 
 /**
@@ -136,7 +139,11 @@ export async function generateFormPDF(
 ): Promise<Uint8Array> {
   const template = getTemplateConfig(input.schema.form_code)
   if (template) {
-    return renderOnTemplate({ template, values: input.values })
+    return renderOnTemplate({
+      template,
+      values: input.values,
+      overrides: input.overrides,
+    })
   }
   return generateGenericFormPDF(input)
 }

@@ -4,8 +4,14 @@ import { createClient } from "@/lib/db/server"
 
 type Params = { params: Promise<{ id: string }> }
 
+const overrideSchema = z.object({
+  dx: z.number().finite(),
+  dy: z.number().finite(),
+})
+
 const patchSchema = z.object({
   field_values: z.record(z.string(), z.string().nullable()).optional(),
+  field_overrides: z.record(z.string(), overrideSchema).optional(),
   period: z.string().max(20).nullable().optional(),
   status: z.enum(["draft", "completed", "filed"]).optional(),
 })

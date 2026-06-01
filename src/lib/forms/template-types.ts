@@ -66,3 +66,17 @@ export type TemplateConfig = {
     values: Record<string, string | null>,
   ) => Record<string, string | null>
 }
+
+/**
+ * Per-submission drag adjustments to a field's position, in PDF points,
+ * relative to the template's default coordinate. Empty {} = use template
+ * positions as-is.
+ */
+export type FieldOverride = {
+  /** Positive moves the field RIGHT in PDF coords. */
+  dx: number
+  /** Positive moves the field UP in PDF coords. */
+  dy: number
+}
+
+export type FieldOverrides = Record<string, FieldOverride>

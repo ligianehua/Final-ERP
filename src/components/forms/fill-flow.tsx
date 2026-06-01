@@ -10,6 +10,7 @@ import { CheckCircle2, AlertCircle, Loader2, Save, Sparkles } from "lucide-react
 import { cn } from "@/lib/utils"
 import { getTemplateConfig } from "@/lib/forms/templates"
 import { FormEditorOverlay } from "./form-editor-overlay"
+import type { FieldOverrides } from "@/lib/forms/template-types"
 
 type FilledField = {
   id: string
@@ -46,6 +47,7 @@ export function FillFlow({ formCode }: { formCode: string }) {
   const [signatoryId, setSignatoryId] = useState<string | null>(null)
   const [data, setData] = useState<FillResponse | null>(null)
   const [values, setValues] = useState<Record<string, string>>({})
+  const [overrides, setOverrides] = useState<FieldOverrides>({})
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -114,6 +116,19 @@ export function FillFlow({ formCode }: { formCode: string }) {
     setValues((s) => ({ ...s, [id]: v }))
   }
 
+  function setOverride(
+    id: string,
+    next: { dx: number; dy: number } | null,
+  ) {
+    setOverrides((s) => {
+      if (!next) {
+        const { [id]: _, ...rest } = s
+        return rest
+      }
+      return { ...s, [id]: next }
+    })
+  }
+
   async function changeSignatory(newId: string) {
     if (!companyId) return
     await runFill(companyId, newId || null)
@@ -137,6 +152,7 @@ export function FillFlow({ formCode }: { formCode: string }) {
         company_id: data.company.id,
         period,
         field_values,
+        field_overrides: overrides,
       }),
     })
     const json = await res.json().catch(() => ({}))
@@ -331,6 +347,8 @@ export function FillFlow({ formCode }: { formCode: string }) {
                     }))}
                     values={values}
                     onChange={setVal}
+                    overrides={overrides}
+                    onOverrideChange={setOverride}
                   />
                 </CardContent>
               </Card>

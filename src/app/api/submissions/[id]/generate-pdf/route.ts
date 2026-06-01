@@ -45,6 +45,10 @@ export async function POST(_request: Request, { params }: Params) {
       values: (sub.field_values ?? {}) as Record<string, string | null>,
       companyName,
       period: sub.period,
+      overrides: (sub.field_overrides ?? {}) as Record<
+        string,
+        { dx: number; dy: number }
+      >,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : "PDF render failed"
