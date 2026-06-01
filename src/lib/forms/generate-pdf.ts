@@ -5,6 +5,8 @@ import {
   StandardFonts,
   rgb,
 } from "pdf-lib"
+import { renderOnTemplate } from "./render-on-template"
+import { getTemplateConfig } from "./templates"
 import type { FormSchema } from "./types"
 
 /**
@@ -123,7 +125,23 @@ export type GeneratePDFInput = {
   period: string | null
 }
 
-export async function generateFormPDF({
+/**
+ * Render a filled form PDF. When the form has a registered template
+ * (an official agency PDF + coordinate map), draw values onto that
+ * template. Otherwise fall back to a generic section-based layout so
+ * forms we haven't templated yet still produce something printable.
+ */
+export async function generateFormPDF(
+  input: GeneratePDFInput,
+): Promise<Uint8Array> {
+  const template = getTemplateConfig(input.schema.form_code)
+  if (template) {
+    return renderOnTemplate({ template, values: input.values })
+  }
+  return generateGenericFormPDF(input)
+}
+
+async function generateGenericFormPDF({
   schema,
   values,
   companyName,
