@@ -64,6 +64,18 @@ try {
   const pdf = await readFile(stagedOutput)
   await writeFile(outputPath, pdf)
   console.log(`✓ wrote ${outputPath} (${(pdf.length / 1024).toFixed(1)} KB)`)
+
+  // Also render each page to PNG at 150 DPI so the in-browser WYSIWYG
+  // editor can use them as background images.
+  const pngPrefix = join(outputDir, baseName)
+  console.log(`→ pdftoppm -r 150 -png ${baseName}.pdf ${baseName}-N.png`)
+  await execFileAsync(
+    "pdftoppm",
+    ["-r", "150", "-png", outputPath, pngPrefix],
+    { timeout: 60_000 },
+  )
+  // pdftoppm outputs e.g. BIR_2550M-1.png, BIR_2550M-2.png, …
+  console.log(`✓ wrote page PNGs to ${outputDir}`)
 } finally {
   await rm(workDir, { recursive: true, force: true }).catch(() => {})
 }

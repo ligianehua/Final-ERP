@@ -6,64 +6,22 @@ import {
 } from "pdf-lib"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
+import type {
+  AcroFormMapping,
+  CoordSpec,
+  CoordinateMapping,
+  TemplateConfig,
+  TemplateDimensions,
+} from "./template-types"
 
-/**
- * Where (and how) to place a single value on a coordinate-mapped PDF.
- *
- * pdf-lib uses a bottom-left origin: y grows upward. Coordinates are in
- * PDF points (1 pt = 1/72 inch). For US Legal pages, the page is
- * 612 wide × 1008 tall.
- *
- * `y` is the BASELINE the text sits on (matches `drawText` semantics).
- * For AcroForm output, we offset the field box down by a small descender
- * margin so the visible text lines up with the same baseline.
- *
- * `width` / `height` are also used by the in-browser WYSIWYG editor to
- * size the HTML input overlays; keep them filled in for both reasons.
- */
-export type CoordSpec = {
-  /** 1-indexed page number. */
-  page: number
-  x: number
-  y: number
-  /** Width of the input box. Defaults to `maxWidth` ?? 100. */
-  width?: number
-  /** Height of the input box. Defaults to `size + 4`. */
-  height?: number
-  /** Font size in points. Defaults to 10. */
-  size?: number
-  /** Horizontal anchor for `x`. Defaults to "left". */
-  align?: "left" | "right" | "center"
-  /**
-   * Optional cap for visible text width. Used as the default `width`
-   * if width is absent. Affects truncation in flat-draw mode only.
-   */
-  maxWidth?: number
-}
-
-export type AcroFormMapping = {
-  strategy: "acroform"
-  /** schema field id → AcroForm widget name */
-  fields: Record<string, string>
-}
-
-export type CoordinateMapping = {
-  strategy: "coordinates"
-  /** schema field id → where on the page to draw the value */
-  fields: Record<string, CoordSpec>
-}
-
-export type TemplateConfig = {
-  /** Path to the template PDF, relative to project root. */
-  pdf_path: string
-  mapping: AcroFormMapping | CoordinateMapping
-  /**
-   * Optional value transformer applied before rendering. Use it to derive
-   * composite fields (e.g. `period` from `period_month` + `period_year`).
-   */
-  transformValues?: (
-    values: Record<string, string | null>,
-  ) => Record<string, string | null>
+// Re-export so existing imports of these types from render-on-template
+// keep working.
+export type {
+  AcroFormMapping,
+  CoordSpec,
+  CoordinateMapping,
+  TemplateConfig,
+  TemplateDimensions,
 }
 
 export type RenderInput = {

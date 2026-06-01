@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { CheckCircle2, AlertCircle, Loader2, Save, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getTemplateConfig } from "@/lib/forms/templates"
+import { FormEditorOverlay } from "./form-editor-overlay"
 
 type FilledField = {
   id: string
@@ -284,69 +286,143 @@ export function FillFlow({ formCode }: { formCode: string }) {
         </CardContent>
       </Card>
 
-      {/* Fields */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Form fields</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {data.fields.map((f) => {
-            const v = values[f.id] ?? ""
-            const filled = v.trim() !== ""
-            const fromArchive = f.source && filled && (values[f.id] === (f.value ?? ""))
-            const isVatStatus = f.semantic_type === "company_vat_status"
-            return (
-              <div key={f.id} className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor={f.id} className="flex items-center gap-2">
-                    {f.label}
-                    {f.required && <span className="text-destructive">*</span>}
-                  </Label>
-                  <div className="flex items-center gap-2 text-xs">
-                    {f.period_specific && (
-                      <span className="text-muted-foreground">period</span>
-                    )}
-                    {fromArchive && (
-                      <span className="text-green-700 inline-flex items-center gap-1">
-                        <CheckCircle2 className="size-3" /> from archive
-                      </span>
-                    )}
-                    {!filled && f.required && (
-                      <span className="text-destructive">required</span>
-                    )}
-                  </div>
-                </div>
-                {isVatStatus ? (
-                  <select
-                    id={f.id}
-                    value={v}
-                    onChange={(e) => setVal(f.id, e.target.value)}
-                    className={cn(
-                      "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      !filled && f.required && "border-destructive/40 focus-visible:ring-destructive/30"
-                    )}
-                  >
-                    <option value="">— Not set —</option>
-                    <option value="vat_registered">{VAT_STATUS_LABELS.vat_registered}</option>
-                    <option value="non_vat">{VAT_STATUS_LABELS.non_vat}</option>
-                  </select>
-                ) : (
-                  <Input
-                    id={f.id}
-                    value={v}
-                    onChange={(e) => setVal(f.id, e.target.value)}
-                    placeholder={f.placeholder || ""}
-                    className={cn(
-                      !filled && f.required && "border-destructive/40 focus-visible:ring-destructive/30"
-                    )}
+      {(() => {
+        const template = getTemplateConfig(formCode)
+        const useVisualEditor =
+          template && template.mapping.strategy === "coordinates"
+
+        // Which schema field ids are covered by the visual editor?
+        // (period_display is virtual — it covers period_month + period_year.)
+        const covered = new Set<string>()
+        if (useVisualEditor) {
+          for (const k of Object.keys(template.mapping.fields)) {
+            if (k === "period_display") {
+              covered.add("period_month")
+              covered.add("period_year")
+            } else {
+              covered.add(k)
+            }
+          }
+        }
+
+        const orphans = useVisualEditor
+          ? data.fields.filter((f) => !covered.has(f.id))
+          : data.fields
+
+        return (
+          <>
+            {useVisualEditor && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Edit on the form</CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    Click any value to edit. Yellow tint = focused cell.
+                    Required-empty cells show a red ring.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <FormEditorOverlay
+                    formCode={formCode}
+                    template={template}
+                    fields={data.fields.map((f) => ({
+                      id: f.id,
+                      label: f.label,
+                      required: f.required,
+                    }))}
+                    values={values}
+                    onChange={setVal}
                   />
-                )}
-                {f.hint && <p className="text-xs text-muted-foreground">{f.hint}</p>}
-              </div>
-            )
-          })}
-        </CardContent>
-      </Card>
+                </CardContent>
+              </Card>
+            )}
+
+            {orphans.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    {useVisualEditor
+                      ? "Other fields not on the printed form"
+                      : "Form fields"}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {orphans.map((f) => {
+                    const v = values[f.id] ?? ""
+                    const filled = v.trim() !== ""
+                    const fromArchive =
+                      f.source && filled && (values[f.id] === (f.value ?? ""))
+                    const isVatStatus = f.semantic_type === "company_vat_status"
+                    return (
+                      <div key={f.id} className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <Label
+                            htmlFor={f.id}
+                            className="flex items-center gap-2"
+                          >
+                            {f.label}
+                            {f.required && (
+                              <span className="text-destructive">*</span>
+                            )}
+                          </Label>
+                          <div className="flex items-center gap-2 text-xs">
+                            {f.period_specific && (
+                              <span className="text-muted-foreground">period</span>
+                            )}
+                            {fromArchive && (
+                              <span className="text-green-700 inline-flex items-center gap-1">
+                                <CheckCircle2 className="size-3" /> from archive
+                              </span>
+                            )}
+                            {!filled && f.required && (
+                              <span className="text-destructive">required</span>
+                            )}
+                          </div>
+                        </div>
+                        {isVatStatus ? (
+                          <select
+                            id={f.id}
+                            value={v}
+                            onChange={(e) => setVal(f.id, e.target.value)}
+                            className={cn(
+                              "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                              !filled &&
+                                f.required &&
+                                "border-destructive/40 focus-visible:ring-destructive/30",
+                            )}
+                          >
+                            <option value="">— Not set —</option>
+                            <option value="vat_registered">
+                              {VAT_STATUS_LABELS.vat_registered}
+                            </option>
+                            <option value="non_vat">
+                              {VAT_STATUS_LABELS.non_vat}
+                            </option>
+                          </select>
+                        ) : (
+                          <Input
+                            id={f.id}
+                            value={v}
+                            onChange={(e) => setVal(f.id, e.target.value)}
+                            placeholder={f.placeholder || ""}
+                            className={cn(
+                              !filled &&
+                                f.required &&
+                                "border-destructive/40 focus-visible:ring-destructive/30",
+                            )}
+                          />
+                        )}
+                        {f.hint && (
+                          <p className="text-xs text-muted-foreground">{f.hint}</p>
+                        )}
+                      </div>
+                    )
+                  })}
+                </CardContent>
+              </Card>
+            )}
+          </>
+        )
+      })()}
 
       {error && (
         <p className="text-sm text-destructive border border-destructive/30 rounded-md p-3">

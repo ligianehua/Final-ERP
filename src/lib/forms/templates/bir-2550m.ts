@@ -1,4 +1,4 @@
-import type { TemplateConfig } from "../render-on-template"
+import type { TemplateConfig } from "../template-types"
 
 /**
  * Coordinate map for the official BIR 2550M PDF
@@ -28,6 +28,7 @@ const fromTop = (yTop: number) => PAGE_H - yTop
 
 export const BIR_2550M_TEMPLATE: TemplateConfig = {
   pdf_path: "public/form-templates/BIR_2550M.pdf",
+  dimensions: { width: 612, height: 1008, pageCount: 5 },
   transformValues: (values) => {
     const month = values.period_month?.padStart(2, "0")
     const year = values.period_year

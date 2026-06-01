@@ -1,4 +1,4 @@
-import type { TemplateConfig } from "../render-on-template"
+import type { TemplateConfig } from "../template-types"
 import { BIR_2550M_TEMPLATE } from "./bir-2550m"
 
 /**
