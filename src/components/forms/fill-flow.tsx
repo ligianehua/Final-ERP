@@ -10,6 +10,10 @@ import { CheckCircle2, AlertCircle, Loader2, Save, Sparkles } from "lucide-react
 import { cn } from "@/lib/utils"
 import { FormEditorOverlay } from "./form-editor-overlay"
 import { VATExtractor } from "./vat-extractor"
+import {
+  ArchiveSyncDialog,
+  type SyncCandidate,
+} from "./archive-sync-dialog"
 import type {
   CoordSpec,
   FieldOverrides,
@@ -64,6 +68,62 @@ function formatAmount(n: number): string {
 }
 
 /**
+ * Find fields the user edited away from the AI's archive-sourced value.
+ * Each candidate carries the routing info needed for a PATCH.
+ */
+function computeSyncCandidates({
+  fields,
+  values,
+  initialFromAI,
+  companyId,
+  signatoryId,
+}: {
+  fields: FilledField[]
+  values: Record<string, string>
+  initialFromAI: Record<string, string>
+  companyId: string
+  signatoryId: string | null
+}): SyncCandidate[] {
+  const out: SyncCandidate[] = []
+  for (const f of fields) {
+    // Only fields with an archive data_source can sync back.
+    if (!f.source) continue
+    const [tableShort, field] = f.source.split(".")
+    if (!tableShort || !field) continue
+
+    const before = initialFromAI[f.id] ?? ""
+    const after = values[f.id] ?? ""
+    if (before.trim() === after.trim()) continue
+
+    let targetTable: "companies" | "company_people"
+    let targetId: string | null
+    if (tableShort === "company") {
+      targetTable = "companies"
+      targetId = companyId
+    } else if (tableShort === "person") {
+      targetTable = "company_people"
+      targetId = signatoryId
+    } else {
+      continue
+    }
+    // No signatory selected → can't sync person fields.
+    if (!targetId) continue
+
+    out.push({
+      fieldId: f.id,
+      label: f.label,
+      source: f.source,
+      before,
+      after,
+      targetTable,
+      targetId,
+      targetField: field,
+    })
+  }
+  return out
+}
+
+/**
  * BIR 2550M tax-computation formulas. Mutates `next` so an upstream edit
  * to gross_sales / output_tax / input_tax cascades down to the derived
  * cells. User can still edit any cell directly; the next upstream change
@@ -114,9 +174,21 @@ export function FillFlow({
   const [values, setValues] = useState<Record<string, string>>(
     initial?.values ?? {},
   )
+  /**
+   * Original archive values as the AI returned them on first fill. We
+   * diff `values` against this at save time to decide which edits the
+   * user might want to push back to the company / person archive.
+   */
+  const [initialFromAI, setInitialFromAI] = useState<Record<string, string>>(
+    initial?.values ?? {},
+  )
   const [overrides, setOverrides] = useState<FieldOverrides>(
     initial?.overrides ?? {},
   )
+  const [syncDialog, setSyncDialog] = useState<{
+    open: boolean
+    candidates: SyncCandidate[]
+  }>({ open: false, candidates: [] })
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -189,11 +261,15 @@ export function FillFlow({
     setSignatoryId(json.signatory_id)
     if (preserveValues) {
       setValues(preserveValues)
+      setInitialFromAI(preserveValues)
     } else {
       const init: Record<string, string> = {}
       for (const f of json.fields as FilledField[]) {
         init[f.id] = f.value ?? ""
       }
+      // Snapshot what the AI returned BEFORE any user edits so we can
+      // diff against it later for the archive-sync prompt.
+      setInitialFromAI({ ...init })
       // Cascade VAT formulas once on initial AI-filled values so derived
       // cells aren't blank when the user first sees the form.
       if (formCode === "BIR_2550M") {
@@ -296,6 +372,67 @@ export function FillFlow({
       return
     }
     setSaving(false)
+
+    // Look for edited fields whose value originally came from the archive.
+    // If any, ask the user before navigating away.
+    const candidates = computeSyncCandidates({
+      fields: data.fields,
+      values,
+      initialFromAI,
+      companyId: data.company.id,
+      signatoryId,
+    })
+    if (candidates.length > 0) {
+      setSyncDialog({ open: true, candidates })
+    } else {
+      router.push("/submissions")
+      router.refresh()
+    }
+  }
+
+  async function applyArchiveSync(picks: SyncCandidate[]) {
+    // Group updates by target row (one PATCH per row).
+    const updates = new Map<string, { table: string; id: string; body: Record<string, string | null> }>()
+    for (const c of picks) {
+      const key = `${c.targetTable}:${c.targetId}`
+      const entry = updates.get(key) ?? {
+        table: c.targetTable,
+        id: c.targetId,
+        body: {},
+      }
+      entry.body[c.targetField] = c.after.trim() === "" ? null : c.after
+      updates.set(key, entry)
+    }
+
+    const failures: string[] = []
+    await Promise.all(
+      Array.from(updates.values()).map(async (u) => {
+        const url =
+          u.table === "companies"
+            ? `/api/companies/${u.id}`
+            : `/api/people/${u.id}`
+        const res = await fetch(url, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(u.body),
+        })
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}))
+          failures.push(j.error || `Failed to update ${u.table}`)
+        }
+      }),
+    )
+    if (failures.length > 0) {
+      throw new Error(failures.join("; "))
+    }
+
+    setSyncDialog({ open: false, candidates: [] })
+    router.push("/submissions")
+    router.refresh()
+  }
+
+  function skipArchiveSync() {
+    setSyncDialog({ open: false, candidates: [] })
     router.push("/submissions")
     router.refresh()
   }
@@ -618,6 +755,17 @@ export function FillFlow({
           {initial ? "Update draft" : "Save draft"}
         </Button>
       </div>
+
+      <ArchiveSyncDialog
+        open={syncDialog.open}
+        candidates={syncDialog.candidates}
+        companyName={data?.company.name ?? ""}
+        signatoryName={
+          data?.people.find((p) => p.id === signatoryId)?.full_name ?? null
+        }
+        onApply={applyArchiveSync}
+        onSkip={skipArchiveSync}
+      />
     </div>
   )
 }
