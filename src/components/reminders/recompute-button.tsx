@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Loader2, RefreshCw } from "lucide-react"
+import { toast } from "@/components/ui/toaster"
 
 /**
  * Triggers a manual reminders-recompute. The daily cron will normally
@@ -13,30 +14,35 @@ import { Loader2, RefreshCw } from "lucide-react"
 export function RecomputeRemindersButton() {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   async function handle() {
     setBusy(true)
-    setError(null)
     const res = await fetch("/api/reminders/recompute", { method: "POST" })
+    const json = await res.json().catch(() => ({}))
+    setBusy(false)
     if (!res.ok) {
-      const json = await res.json().catch(() => ({}))
-      setError(json.error || "Recompute failed")
-      setBusy(false)
-      setTimeout(() => setError(null), 5000)
+      toast({
+        variant: "destructive",
+        title: "Recompute failed",
+        description: json.error ?? "Try again in a moment.",
+      })
       return
     }
+    toast({
+      variant: "success",
+      title: "Reminders refreshed",
+      description:
+        typeof json.created === "number"
+          ? `${json.created} new row${json.created === 1 ? "" : "s"} created.`
+          : "Up to date.",
+    })
     router.refresh()
-    setBusy(false)
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
-      <Button onClick={handle} disabled={busy} variant="outline" size="sm" className="gap-2">
-        {busy ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-        Recompute now
-      </Button>
-      {error && <span className="text-xs text-destructive">{error}</span>}
-    </div>
+    <Button onClick={handle} disabled={busy} variant="outline" size="sm" className="gap-2">
+      {busy ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+      Recompute now
+    </Button>
   )
 }

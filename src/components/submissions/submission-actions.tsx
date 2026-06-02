@@ -23,6 +23,7 @@ import {
   RotateCcw,
   Trash2,
 } from "lucide-react"
+import { toast } from "@/components/ui/toaster"
 
 type Props = {
   submissionId: string
@@ -41,55 +42,65 @@ export function SubmissionActions({
   const [busy, setBusy] = useState<
     "generate" | "download" | "delete" | null
   >(null)
-  const [error, setError] = useState<string | null>(null)
 
   async function generate() {
     setBusy("generate")
-    setError(null)
     const res = await fetch(`/api/submissions/${submissionId}/generate-pdf`, {
       method: "POST",
     })
     const json = await res.json().catch(() => ({}))
+    setBusy(null)
     if (!res.ok) {
-      setError(json.error || "Generate failed")
-      setBusy(null)
-      setTimeout(() => setError(null), 5000)
+      toast({
+        variant: "destructive",
+        title: "Generate failed",
+        description: json.error ?? "Couldn't render the PDF.",
+      })
       return
     }
+    toast({
+      variant: "success",
+      title: "PDF ready",
+      description: "Click Download to get your file.",
+    })
     router.refresh()
-    setBusy(null)
   }
 
   async function download() {
     if (!outputPdfPath) return
     setBusy("download")
-    setError(null)
     const supabase = createClient()
     const { data, error: signedError } = await supabase.storage
       .from("documents")
       .createSignedUrl(outputPdfPath, 60)
+    setBusy(null)
     if (data?.signedUrl) {
       window.open(data.signedUrl, "_blank")
     } else if (signedError) {
-      setError(signedError.message)
-      setTimeout(() => setError(null), 5000)
+      toast({
+        variant: "destructive",
+        title: "Download failed",
+        description: signedError.message,
+      })
     }
-    setBusy(null)
   }
 
   async function handleDelete() {
     setBusy("delete")
-    setError(null)
     const res = await fetch(`/api/submissions/${submissionId}`, {
       method: "DELETE",
     })
     if (!res.ok) {
       const json = await res.json().catch(() => ({}))
-      setError(json.error || "Delete failed")
       setBusy(null)
-      setTimeout(() => setError(null), 5000)
+      toast({
+        variant: "destructive",
+        title: "Delete failed",
+        description: json.error ?? "Try again.",
+      })
       return
     }
+    toast({ variant: "success", title: "Submission deleted" })
     router.refresh()
     // busy stays "delete" until the row disappears on refresh
   }
@@ -199,7 +210,6 @@ export function SubmissionActions({
           </DialogContent>
         </Dialog>
       </div>
-      {error && <span className="text-xs text-destructive">{error}</span>}
     </div>
   )
 }

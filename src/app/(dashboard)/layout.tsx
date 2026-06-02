@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/db/server"
 import { Sidebar } from "@/components/layout/sidebar"
 import { Topbar } from "@/components/layout/topbar"
+import { Toaster } from "@/components/ui/toaster"
 
 export default async function DashboardLayout({
   children,
@@ -22,6 +23,7 @@ export default async function DashboardLayout({
         <Sidebar />
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
+      <Toaster />
     </div>
   )
 }
