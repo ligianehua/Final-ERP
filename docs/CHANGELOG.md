@@ -155,3 +155,124 @@ Docker target (Fly.io / Railway / self-hosted) does.
 - Wire the endpoint into a template-upload UI for admins (deferred —
   separate ticket)
 - Continue Week 6 form-fill polish on top of the now-canonical BIR PDF
+
+---
+
+## Week 6 wrap — 2026-06-01 → 2026-06-02
+
+### Done — PDF rendering pipeline (dual-path)
+- `render-on-template.ts` dispatches per template: AcroForm path fills
+  by field name, coordinate path synthesises real AcroForm fields at
+  the mapped positions. Downloaded PDFs stay editable.
+- `templates/bir-2550m.ts`: 14-field coord map for BIR 2550M, derived
+  from `pdftotext -bbox-layout` then offset by hand; tight field
+  heights (`size + 2`) so the viewer's focus highlight doesn't bleed.
+
+### Done — WYSIWYG editor (Phase 2)
+- 2a: PDF pages pre-rendered as PNGs and used as backgrounds;
+  absolutely-positioned transparent `<input>`s at the coord-map
+  positions. Yellow hover / focus, red ring on required-empty.
+- 2b: Layout mode + drag-to-reposition. Overrides stored on
+  `form_submissions.field_overrides` and applied at PDF generation.
+- 2c: Admins (ADMIN_EMAILS allow-list) can save the current layout
+  back to the template as the new default for every user. Stored on
+  `form_templates.field_mapping`.
+
+### Done — Submissions UX (Edit + Delete)
+- Pencil icon on each History row → opens fill page with saved values,
+  overrides, and period restored; Save becomes PATCH-style.
+- Trash icon → confirmation dialog → DELETE (also cleans up the
+  stored PDF object).
+
+### Done — Tax-amount auto-fill (L1 + L2)
+- L1: typing into `gross_sales` cascades to `output_tax` (×12%) and
+  `vat_payable` (output − input). Cascade also runs once on initial
+  AI fill so derived cells aren't blank.
+- L2: above the editor, a tabbed `<VATExtractor>`:
+    Monthly summary — drop one Excel/PDF/image/Word/CSV/text doc,
+                      AI extracts {gross_sales, output_tax,
+                      input_tax, vat_payable, period}, Apply pushes
+                      values through setVal so L1 still cascades.
+    OR receipts    — drop multiple JPG/PNG/PDF receipts, each is
+                      extracted sequentially with confidence, table
+                      sums the VAT, Apply pushes the sum into
+                      input_tax.
+
+### Done — Archive sync on save (US-03)
+- `<ArchiveSyncDialog>` after Save Draft: candidates = fields with
+  data_source the user edited away from the AI's archive-sourced
+  value. Each candidate routes to companies / company_people PATCH;
+  user picks the subset to apply.
+
+---
+
+## Week 7 — 2026-06-02 → 2026-06-03
+
+### Done — Reminders backbone
+- `0010_reminders.sql`: unique (user_id, source_key) makes the
+  compute idempotent; snooze + dismiss + email_sent_at live on the
+  same row.
+- `src/lib/reminders/compute.ts`: walks documents.expiry_date, builds
+  a T-90/30/14/7 ladder per doc. Upserts with ignoreDuplicates so
+  existing snooze / dismiss state survives re-runs.
+- GET `/api/reminders` + POST `/api/reminders/recompute`.
+- `/reminders` page: grouped by company, tone badges
+  (past / soon / far), empty state with CTA.
+
+### Done — Daily cron + Resend digest emails
+- `src/lib/db/admin.ts`: service-role Supabase client.
+- `src/lib/email/send-reminder.ts`: Resend REST POST + inline HTML
+  template (no SDK dependency).
+- `/api/cron/check-reminders`: walks every user, refreshes reminders,
+  pulls due-and-untouched rows, sends one digest email per user,
+  stamps `email_sent_at`. Auth via `CRON_SECRET`.
+- `vercel.json`: daily at 08:00 UTC.
+
+### Done — Snooze + dismiss actions
+- PATCH / DELETE `/api/reminders/[id]`.
+- `<ReminderActions>`: ··· menu with Snooze (1d / 7d / 30d) +
+  Mark done. Uses the new `ui/dropdown-menu.tsx` (Radix wrapper).
+
+### Done — Dashboard home
+- `/dashboard` is the post-login landing (auth callback redirect
+  updated). Greeting + two side-by-side widgets:
+    Upcoming reminders — soonest 5 active rows.
+    Recent activity   — last 7 days of submissions + uploads,
+                        merged newest-first, capped at 6.
+- Sidebar adds Dashboard at the top.
+
+---
+
+## Week 8 — 2026-06-03 → 2026-06-04
+
+### Done — Mobile nav drawer (Phase 1)
+- Extracted shared NavLinks. Sidebar (desktop) and MobileNav drawer
+  (`md:hidden`) consume the same items.
+- Topbar mounts a hamburger button on mobile; drawer closes on
+  route change, locks body scroll while open.
+
+### Done — Toast notifications (Phase 2)
+- `ui/toaster.tsx`: module-scoped `toast()` emitter over Radix Toast
+  primitives. Variants default / success / destructive.
+- Mounted once in DashboardLayout.
+- Wired into RecomputeRemindersButton + SubmissionActions
+  (Generate / Download / Delete) — dropped their inline error
+  `<span>`s and added explicit success states.
+
+### Done — Per-page metadata + OG image (Phase 3)
+- `app/layout.tsx`: title template ("%s · Quill"), OG + Twitter
+  card defaults, metadataBase from `NEXT_PUBLIC_APP_URL`.
+- Each top-level dashboard page exports its own metadata.
+- `app/opengraph-image.tsx`: dynamic 1200×630 PNG via next/og.
+- Fixed dead `/documents` sidebar link by adding a global
+  all-documents list page with expiry tone badges.
+
+### Done — Demo script (Phase 4)
+- `docs/DEMO-SCRIPT.md`: a 60-second magic-moment reel + a 5-minute
+  walkthrough, plus recording notes.
+
+### Next
+- Other 4 form templates (MAYORS_PERMIT_RENEWAL, BIR_0605, SEC_GIS,
+  SSS_R3) — same recipe as BIR 2550M.
+- Mobile responsiveness pass on /forms/fill (editor at scale).
+- Real customer pilots (LJ Group accountant + 5-10 friend SMEs).
