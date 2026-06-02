@@ -117,13 +117,18 @@ export type FormSubmission = {
 
 export type Reminder = {
   id: string
+  user_id: string
   company_id: string
   document_id: string | null
+  submission_id: string | null
   reminder_type: "document_expiry" | "form_deadline"
   title: string
   due_date: string
+  target_date: string | null
+  source_key: string
   snoozed_until: string | null
-  is_dismissed: boolean
+  dismissed_at: string | null
+  email_sent_at: string | null
   created_at: string
 }
 
