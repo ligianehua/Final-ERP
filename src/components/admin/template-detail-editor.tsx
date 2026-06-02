@@ -21,6 +21,7 @@ import {
 import { FieldSchemaEditor } from "@/components/admin/field-schema-editor"
 import { ReplacePdfButton } from "@/components/admin/replace-pdf-button"
 import { ReanalyzeAIButton } from "@/components/admin/reanalyze-ai-button"
+import { TemplateExportButton } from "@/components/admin/template-export-button"
 import { toast } from "@/components/ui/toaster"
 import type { FieldOverrides, CoordSpec } from "@/lib/forms/template-types"
 
@@ -214,7 +215,23 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
     const merged: Record<string, CoordSpec> = {}
     for (const [id, spec] of Object.entries(template.mapping.fields)) {
       const o = overrides[id]
-      merged[id] = o ? { ...spec, x: spec.x + o.dx, y: spec.y + o.dy } : spec
+      if (!o) {
+        merged[id] = spec
+        continue
+      }
+      const baseW = spec.width ?? spec.maxWidth ?? 100
+      const baseH = spec.height ?? (spec.size ?? 10) + 2
+      const dw = o.dw ?? 0
+      const dh = o.dh ?? 0
+      merged[id] = {
+        ...spec,
+        x: spec.x + o.dx,
+        // Baseline-y compensated by -dh so the rendered text top stays
+        // where the admin dragged it during resize.
+        y: spec.y + o.dy - dh,
+        width: Math.max(20, baseW + dw),
+        height: Math.max(8, baseH + dh),
+      }
     }
     const res = await fetch(
       `/api/forms/templates/${encodeURIComponent(meta.form_code)}`,
@@ -383,7 +400,8 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
                 writes the new positions to the catalog for everyone.
               </p>
             </div>
-            <div className="flex gap-2 shrink-0">
+            <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+              <TemplateExportButton formCode={meta.form_code} />
               {template.mapping.strategy === "coordinates" && (
                 <ReanalyzeAIButton
                   formCode={meta.form_code}
@@ -420,6 +438,7 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
               }}
               overrides={overrides}
               onOverrideChange={setOverride}
+              onReplaceOverrides={setOverrides}
               isAdmin
               onSaveAsTemplate={saveLayout}
               onAddField={addFieldAtPosition}

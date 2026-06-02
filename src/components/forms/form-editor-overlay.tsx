@@ -1,7 +1,16 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
-import { Loader2, Move, Plus, RotateCcw, Save, Type } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  Loader2,
+  Move,
+  Plus,
+  Redo2,
+  RotateCcw,
+  Save,
+  Type,
+  Undo2,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -52,8 +61,13 @@ type Props = {
   /** Set a single field's override, or pass null to remove it. */
   onOverrideChange: (
     id: string,
-    override: { dx: number; dy: number } | null,
+    override: { dx: number; dy: number; dw?: number; dh?: number } | null,
   ) => void
+  /**
+   * Wholesale replace — used by the undo/redo stack to restore an
+   * earlier snapshot in one go.
+   */
+  onReplaceOverrides?: (next: FieldOverrides) => void
   /** Show "Save as template default" affordance. */
   isAdmin?: boolean
   /** Persist current overrides as the new template default. */
@@ -145,12 +159,70 @@ export function FormEditorOverlay({
   onChange,
   overrides,
   onOverrideChange,
+  onReplaceOverrides,
   isAdmin = false,
   onSaveAsTemplate,
   onAddField,
 }: Props) {
   const [displayWidth] = useState(MAX_DISPLAY_WIDTH)
   const [mode, setMode] = useState<EditMode>("values")
+
+  // Undo / redo stacks — only meaningful when the parent passes
+  // onReplaceOverrides (admin Layout mode). Each entry is a snapshot
+  // of the entire FieldOverrides map taken just before a drag/resize
+  // starts, so a single revert returns to the pre-gesture state.
+  const undoStack = useRef<FieldOverrides[]>([])
+  const redoStack = useRef<FieldOverrides[]>([])
+  const [undoCount, setUndoCount] = useState(0)
+  const [redoCount, setRedoCount] = useState(0)
+
+  const snapshotOverrides = useCallback(() => {
+    if (!onReplaceOverrides) return
+    // Deep-copy so later mutations don't bleed back into history.
+    undoStack.current.push(
+      Object.fromEntries(
+        Object.entries(overrides).map(([k, v]) => [k, { ...v }]),
+      ),
+    )
+    redoStack.current = []
+    setUndoCount(undoStack.current.length)
+    setRedoCount(0)
+  }, [overrides, onReplaceOverrides])
+
+  const undo = useCallback(() => {
+    if (!onReplaceOverrides) return
+    const prev = undoStack.current.pop()
+    if (!prev) return
+    redoStack.current.push(overrides)
+    onReplaceOverrides(prev)
+    setUndoCount(undoStack.current.length)
+    setRedoCount(redoStack.current.length)
+  }, [overrides, onReplaceOverrides])
+
+  const redo = useCallback(() => {
+    if (!onReplaceOverrides) return
+    const next = redoStack.current.pop()
+    if (!next) return
+    undoStack.current.push(overrides)
+    onReplaceOverrides(next)
+    setUndoCount(undoStack.current.length)
+    setRedoCount(redoStack.current.length)
+  }, [overrides, onReplaceOverrides])
+
+  // Cmd/Ctrl + Z = undo, +Shift = redo. Only active in layout mode so
+  // a user typing values isn't trapped.
+  useEffect(() => {
+    if (mode !== "layout" || !onReplaceOverrides) return
+    function handler(e: KeyboardEvent) {
+      const isMod = e.ctrlKey || e.metaKey
+      if (!isMod || e.key.toLowerCase() !== "z") return
+      e.preventDefault()
+      if (e.shiftKey) redo()
+      else undo()
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [mode, onReplaceOverrides, undo, redo])
   const canRightClickAdd = isAdmin && mode === "layout" && !!onAddField
   const [pendingAdd, setPendingAdd] = useState<{
     page: number
@@ -248,10 +320,16 @@ export function FormEditorOverlay({
         onModeChange={setMode}
         overrideCount={Object.keys(overrides).length}
         onResetAll={() => {
+          snapshotOverrides()
           for (const id of Object.keys(overrides)) onOverrideChange(id, null)
         }}
         isAdmin={isAdmin}
         onSaveAsTemplate={onSaveAsTemplate}
+        undoCount={undoCount}
+        redoCount={redoCount}
+        onUndo={undo}
+        onRedo={redo}
+        showUndo={!!onReplaceOverrides && mode === "layout"}
       />
 
       {pageCount > 1 && (
@@ -321,6 +399,7 @@ export function FormEditorOverlay({
                     if (!writeVirtual(id, next, onChange)) onChange(id, next)
                   }}
                   onOverrideChange={onOverrideChange}
+                  onGestureStart={snapshotOverrides}
                 />
               ))}
 
@@ -550,6 +629,11 @@ function ModeBar({
   onResetAll,
   isAdmin,
   onSaveAsTemplate,
+  undoCount,
+  redoCount,
+  onUndo,
+  onRedo,
+  showUndo,
 }: {
   mode: EditMode
   onModeChange: (m: EditMode) => void
@@ -557,6 +641,11 @@ function ModeBar({
   onResetAll: () => void
   isAdmin: boolean
   onSaveAsTemplate?: () => Promise<{ ok: boolean; message: string }>
+  undoCount: number
+  redoCount: number
+  onUndo: () => void
+  onRedo: () => void
+  showUndo: boolean
 }) {
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState<{ ok: boolean; message: string } | null>(
@@ -603,6 +692,34 @@ function ModeBar({
       </div>
 
       <div className="flex items-center gap-3">
+        {showUndo && (
+          <div className="inline-flex items-center gap-1 mr-1">
+            <button
+              type="button"
+              onClick={onUndo}
+              disabled={undoCount === 0}
+              title="Undo (Ctrl/Cmd+Z)"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              <Undo2 className="size-3.5" />
+              <span className="text-[10px] text-muted-foreground">
+                {undoCount > 0 ? undoCount : ""}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={onRedo}
+              disabled={redoCount === 0}
+              title="Redo (Ctrl/Cmd+Shift+Z)"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              <Redo2 className="size-3.5" />
+              <span className="text-[10px] text-muted-foreground">
+                {redoCount > 0 ? redoCount : ""}
+              </span>
+            </button>
+          </div>
+        )}
         {status && (
           <span
             className={cn(
@@ -661,10 +778,13 @@ function FieldCell({
   required,
   onValueChange,
   onOverrideChange,
+  onGestureStart,
 }: {
   id: string
   spec: CoordSpec
-  override: { dx: number; dy: number } | undefined
+  override:
+    | { dx: number; dy: number; dw?: number; dh?: number }
+    | undefined
   scale: number
   pdfH: number
   mode: EditMode
@@ -673,13 +793,24 @@ function FieldCell({
   required: boolean
   onValueChange: (next: string) => void
   onOverrideChange: Props["onOverrideChange"]
+  /** Snapshot for undo before this field's first gesture starts. */
+  onGestureStart?: () => void
 }) {
   const size = spec.size ?? 10
-  const width = spec.width ?? spec.maxWidth ?? 100
-  const height = spec.height ?? size + 2
+  const baseWidth = spec.width ?? spec.maxWidth ?? 100
+  const baseHeight = spec.height ?? size + 2
 
-  const effectiveX = spec.x + (override?.dx ?? 0)
-  const effectiveY = spec.y + (override?.dy ?? 0)
+  const dx = override?.dx ?? 0
+  const dy = override?.dy ?? 0
+  const dw = override?.dw ?? 0
+  const dh = override?.dh ?? 0
+
+  // Width/height grow toward the bottom-right; baseline-y is
+  // compensated by -dh so the screen TOP stays anchored.
+  const width = Math.max(20, baseWidth + dw)
+  const height = Math.max(8, baseHeight + dh)
+  const effectiveX = spec.x + dx
+  const effectiveY = spec.y + dy - dh
 
   let boxLeftPdf = effectiveX
   if (spec.align === "right") boxLeftPdf = effectiveX - width
@@ -697,10 +828,17 @@ function FieldCell({
 
   function startDrag(e: React.MouseEvent) {
     e.preventDefault()
+    e.stopPropagation()
+    onGestureStart?.()
     isDragging.current = true
     const startMX = e.clientX
     const startMY = e.clientY
-    const initial = override ?? { dx: 0, dy: 0 }
+    const initial = {
+      dx: override?.dx ?? 0,
+      dy: override?.dy ?? 0,
+      dw: override?.dw,
+      dh: override?.dh,
+    }
 
     function handleMove(ev: MouseEvent) {
       const dPx = ev.clientX - startMX
@@ -709,11 +847,46 @@ function FieldCell({
         dx: initial.dx + dPx / scale,
         // CSS top grows down; PDF y grows up. Flip.
         dy: initial.dy - dPy / scale,
+        dw: initial.dw,
+        dh: initial.dh,
       })
     }
 
     function handleUp() {
       isDragging.current = false
+      window.removeEventListener("mousemove", handleMove)
+      window.removeEventListener("mouseup", handleUp)
+    }
+
+    window.addEventListener("mousemove", handleMove)
+    window.addEventListener("mouseup", handleUp)
+  }
+
+  function startResize(e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    onGestureStart?.()
+    const startMX = e.clientX
+    const startMY = e.clientY
+    const initial = {
+      dx: override?.dx ?? 0,
+      dy: override?.dy ?? 0,
+      dw: override?.dw ?? 0,
+      dh: override?.dh ?? 0,
+    }
+
+    function handleMove(ev: MouseEvent) {
+      const dPx = ev.clientX - startMX
+      const dPy = ev.clientY - startMY
+      onOverrideChange(id, {
+        dx: initial.dx,
+        dy: initial.dy,
+        dw: initial.dw + dPx / scale,
+        dh: initial.dh + dPy / scale,
+      })
+    }
+
+    function handleUp() {
       window.removeEventListener("mousemove", handleMove)
       window.removeEventListener("mouseup", handleUp)
     }
@@ -753,7 +926,7 @@ function FieldCell({
         <div
           onMouseDown={startDrag}
           onDoubleClick={() => onOverrideChange(id, null)}
-          title={`${label} — drag to move, double-click to reset`}
+          title={`${label} — drag to move, corner to resize, double-click to reset`}
           className={cn(
             "absolute cursor-move group",
             "border border-blue-500/50 bg-blue-500/10 hover:bg-blue-500/20",
@@ -777,12 +950,32 @@ function FieldCell({
             {label}
             {override && (
               <span className="ml-1 opacity-80">
-                · Δ{override.dx > 0 ? "+" : ""}
-                {override.dx.toFixed(0)},{override.dy > 0 ? "+" : ""}
-                {override.dy.toFixed(0)}
+                · Δ{dx > 0 ? "+" : ""}
+                {dx.toFixed(0)},{dy > 0 ? "+" : ""}
+                {dy.toFixed(0)}
+                {(dw !== 0 || dh !== 0) && (
+                  <>
+                    {" · "}
+                    {(baseWidth + dw).toFixed(0)}×
+                    {(baseHeight + dh).toFixed(0)}
+                  </>
+                )}
               </span>
             )}
           </span>
+          {/* Bottom-right resize handle — visible on hover, anchored
+              to the box's bottom-right corner. */}
+          <div
+            onMouseDown={startResize}
+            title="Drag to resize"
+            className={cn(
+              "absolute right-0 bottom-0 size-2.5 cursor-se-resize",
+              "bg-blue-600 opacity-0 group-hover:opacity-100",
+              "transition-opacity",
+              override && "bg-amber-600",
+            )}
+            style={{ transform: "translate(50%, 50%)" }}
+          />
         </div>
       )}
     </>

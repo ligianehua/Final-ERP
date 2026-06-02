@@ -13,6 +13,7 @@ import {
   type EditorTemplate,
 } from "./form-editor-overlay"
 import { VATExtractor } from "./vat-extractor"
+import { FormImagePrefill } from "./form-image-prefill"
 import {
   ArchiveSyncDialog,
   type SyncCandidate,
@@ -293,7 +294,7 @@ export function FillFlow({
 
   function setOverride(
     id: string,
-    next: { dx: number; dy: number } | null,
+    next: { dx: number; dy: number; dw?: number; dh?: number } | null,
   ) {
     setOverrides((s) => {
       if (!next) {
@@ -317,7 +318,21 @@ export function FillFlow({
     const merged: Record<string, CoordSpec> = {}
     for (const [id, spec] of Object.entries(template.mapping.fields)) {
       const o = overrides[id]
-      merged[id] = o ? { ...spec, x: spec.x + o.dx, y: spec.y + o.dy } : spec
+      if (!o) {
+        merged[id] = spec
+        continue
+      }
+      const baseW = spec.width ?? spec.maxWidth ?? 100
+      const baseH = spec.height ?? (spec.size ?? 10) + 2
+      const dw = o.dw ?? 0
+      const dh = o.dh ?? 0
+      merged[id] = {
+        ...spec,
+        x: spec.x + o.dx,
+        y: spec.y + o.dy - dh,
+        width: Math.max(20, baseW + dw),
+        height: Math.max(8, baseH + dh),
+      }
     }
     const res = await fetch(`/api/forms/templates/${formCode}`, {
       method: "PATCH",
@@ -590,6 +605,29 @@ export function FillFlow({
         />
       )}
 
+      {data.fields.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Prefill from a scan</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Upload a photo or PDF of a related document (a permit, a
+              certificate, a previous filing) and the AI extracts
+              whatever it can read into the matching fields.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <FormImagePrefill
+              formCode={formCode}
+              fields={data.fields.map((f) => ({ id: f.id, label: f.label }))}
+              currentValues={values}
+              onApply={(updates) => {
+                for (const [id, v] of Object.entries(updates)) setVal(id, v)
+              }}
+            />
+          </CardContent>
+        </Card>
+      )}
+
       {(() => {
         const useVisualEditor =
           template && template.mapping.strategy === "coordinates"
@@ -636,6 +674,7 @@ export function FillFlow({
                     onChange={setVal}
                     overrides={overrides}
                     onOverrideChange={setOverride}
+                    onReplaceOverrides={setOverrides}
                     isAdmin={isAdmin}
                     onSaveAsTemplate={saveAsTemplate}
                   />

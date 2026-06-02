@@ -76,15 +76,23 @@ export type TemplateConfig = {
 }
 
 /**
- * Per-submission drag adjustments to a field's position, in PDF points,
- * relative to the template's default coordinate. Empty {} = use template
- * positions as-is.
+ * Per-submission drag adjustments to a field's position (and optional
+ * size), in PDF points, relative to the template's default coordinate.
+ * Empty {} = use template positions as-is.
+ *
+ * `dw` and `dh` grow the box right + down on screen while keeping the
+ * top-left visually anchored — the renderer compensates the baseline-y
+ * for height changes so admin-feel matches a normal resize handle.
  */
 export type FieldOverride = {
   /** Positive moves the field RIGHT in PDF coords. */
   dx: number
   /** Positive moves the field UP in PDF coords. */
   dy: number
+  /** Positive grows width to the right (defaults to 0). */
+  dw?: number
+  /** Positive grows height downward on screen (defaults to 0). */
+  dh?: number
 }
 
 export type FieldOverrides = Record<string, FieldOverride>

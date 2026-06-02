@@ -13,6 +13,7 @@ import { isAdminEmail } from "@/lib/auth/admin"
 import { getTemplateConfig } from "@/lib/forms/templates"
 import { Button } from "@/components/ui/button"
 import { TemplateDeleteButton } from "@/components/admin/template-delete-button"
+import { TemplateImportButton } from "@/components/admin/template-import-button"
 import { cn } from "@/lib/utils"
 
 export const metadata: Metadata = { title: "Template catalog · Admin" }
@@ -95,12 +96,15 @@ export default async function AdminTemplatesPage() {
             URLs for new versions, or add a new template from scratch.
           </p>
         </div>
-        <Button asChild size="sm" className="gap-2 shrink-0">
-          <Link href="/admin/templates/new">
-            <Plus className="size-4" />
-            Add a template
-          </Link>
-        </Button>
+        <div className="flex gap-2 shrink-0">
+          <TemplateImportButton />
+          <Button asChild size="sm" className="gap-2">
+            <Link href="/admin/templates/new">
+              <Plus className="size-4" />
+              Add a template
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {all.length === 0 ? (
