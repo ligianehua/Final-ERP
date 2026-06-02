@@ -36,6 +36,59 @@ Rules:
 - vat_status: "vat_registered" if marked VAT/VAT-registered; "non_vat" if marked Non-VAT or Percentage Tax; null if unclear.
 - Output ONLY the JSON object. No prose, no markdown fences, no explanation.`
 
+export const TEMPLATE_ANALYSIS_PROMPT_V1 = `You are analyzing a Philippine government / bank / business form. The image is page 1 of a multi-page form template that an administrator wants to add to a catalog so future users can auto-fill it.
+
+Identify three things:
+1) ISSUER  — the organization that issued this form
+2) FORM    — the form's name and (if shown) its official code
+3) FIELDS  — every spot a user is meant to fill in. Skip decorative text, instructions, and pre-printed agency text.
+
+Return JSON in exactly this shape. No prose, no markdown fences.
+
+{
+  "issuer": {
+    "name": "Bureau of Internal Revenue" | "BDO Unibank" | etc.,
+    "type": "government" | "bank" | "lgu" | "other",
+    "abbreviation": "BIR" | "BDO" | null
+  },
+  "form_name": "Monthly Value-Added Tax Declaration",
+  "form_code_suggested": "BIR_2550M",  // uppercase + underscores; reuse a known code if you recognise the form
+  "fields": [
+    {
+      "label": "TIN",
+      "semantic_type": "company_tin",
+      "data_source": "company.tin" | null,
+      "required": true,
+      "approximate_position": { "x_pct": 0.12, "y_pct": 0.15, "width_pct": 0.18, "height_pct": 0.02 } | null,
+      "notes": null
+    }
+  ],
+  "confidence": 0.0..1.0,
+  "reasoning": "1-2 sentences citing what you saw to identify the issuer/form"
+}
+
+Rules:
+- semantic_type MUST be one of:
+    company_name, company_tin, company_sec_no, company_dti_no,
+    company_address, company_city, company_phone, company_email,
+    company_vat_status,
+    period_month, period_year,
+    amount,
+    signatory_name, signatory_tin, signatory_position,
+    text  (catch-all)
+- data_source: only set when the field is OBVIOUSLY pulled from the
+  archive (TIN, registered name, address, signatory). Leave null for
+  period / amount fields and anything ambiguous.
+- approximate_position: percentages relative to the page (0.0 = left/top,
+  1.0 = right/bottom). Don't agonise — admin will fine-tune with a
+  drag-to-reposition editor. If you really can't tell, set to null.
+- form_code_suggested: A-Z, 0-9, underscore. If you can identify the
+  exact official form (e.g. "BIR Form 2550M"), use the canonical code
+  ("BIR_2550M"). Otherwise: ISSUER_SHORT_FORMNAME, e.g.
+  "BDO_ACCOUNT_OPENING".
+- If the page is clearly NOT a form (a cover page, an instruction sheet,
+  a map), set fields: [] and confidence < 0.5 and explain in reasoning.`
+
 export const VAT_SUMMARY_EXTRACTION_PROMPT_V1 = `You are an accounting assistant for Philippine SMEs.
 
 This image is a monthly VAT summary document — could be a sales-and-purchase summary, a bookkeeper's report, an accounting software export (QuickBooks, Xero, etc.), or a hand-prepared summary in any format. Your job is to pull out the key VAT amounts.
