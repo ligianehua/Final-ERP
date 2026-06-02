@@ -46,6 +46,46 @@ type FillResponse = {
 
 type CompanyOption = { id: string; name: string; entity_type: string }
 
+/** Standard Philippine VAT rate. */
+const VAT_RATE = 0.12
+
+function parseAmount(s: string | undefined | null): number | null {
+  if (!s || s.trim() === "") return null
+  const n = Number(s.replace(/[,\s₱]/g, ""))
+  return Number.isFinite(n) ? n : null
+}
+
+function formatAmount(n: number): string {
+  return n.toLocaleString("en-PH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+
+/**
+ * BIR 2550M tax-computation formulas. Mutates `next` so an upstream edit
+ * to gross_sales / output_tax / input_tax cascades down to the derived
+ * cells. User can still edit any cell directly; the next upstream change
+ * will overwrite the manual edit (predictable last-write-wins).
+ */
+function applyVATFormulas(changedId: string, next: Record<string, string>) {
+  if (changedId === "gross_sales") {
+    const sales = parseAmount(next.gross_sales)
+    if (sales !== null) {
+      const outputTax = Math.round(sales * VAT_RATE * 100) / 100
+      next.output_tax = formatAmount(outputTax)
+      const inputTax = parseAmount(next.input_tax) ?? 0
+      next.vat_payable = formatAmount(outputTax - inputTax)
+    }
+    return
+  }
+  if (changedId === "output_tax" || changedId === "input_tax") {
+    const outputTax = parseAmount(next.output_tax) ?? 0
+    const inputTax = parseAmount(next.input_tax) ?? 0
+    next.vat_payable = formatAmount(outputTax - inputTax)
+  }
+}
+
 export type InitialSubmission = {
   id: string
   companyId: string
@@ -153,13 +193,23 @@ export function FillFlow({
       for (const f of json.fields as FilledField[]) {
         init[f.id] = f.value ?? ""
       }
+      // Cascade VAT formulas once on initial AI-filled values so derived
+      // cells aren't blank when the user first sees the form.
+      if (formCode === "BIR_2550M") {
+        applyVATFormulas("gross_sales", init)
+        applyVATFormulas("input_tax", init)
+      }
       setValues(init)
     }
     setLoading(false)
   }
 
   function setVal(id: string, v: string) {
-    setValues((s) => ({ ...s, [id]: v }))
+    setValues((s) => {
+      const next: Record<string, string> = { ...s, [id]: v }
+      if (formCode === "BIR_2550M") applyVATFormulas(id, next)
+      return next
+    })
   }
 
   function setOverride(
