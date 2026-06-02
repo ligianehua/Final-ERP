@@ -2,10 +2,11 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Building2, FileText, FileCheck, History, Bell } from "lucide-react"
+import { Bell, Building2, FileCheck, FileText, History, LayoutDashboard } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const nav = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/companies", label: "Companies", icon: Building2 },
   { href: "/documents", label: "Documents", icon: FileText },
   { href: "/forms", label: "Forms", icon: FileCheck },
