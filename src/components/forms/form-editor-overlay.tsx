@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Loader2, Move, RotateCcw, Save, Type } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type {
@@ -112,6 +112,50 @@ export function FormEditorOverlay({
     return m
   }, [template])
 
+  const fieldCountByPage = useMemo(() => {
+    const m: Record<number, number> = {}
+    for (const [page, entries] of Object.entries(byPage)) {
+      m[Number(page)] = entries.length
+    }
+    return m
+  }, [byPage])
+
+  const pageRefs = useRef<Array<HTMLDivElement | null>>([])
+  const [activePage, setActivePage] = useState(1)
+
+  useEffect(() => {
+    // Highlight whichever page has the most viewport overlap. When the
+    // user scrolls, the thumbnail strip follows.
+    const els = pageRefs.current.filter(
+      (el): el is HTMLDivElement => el !== null,
+    )
+    if (els.length === 0) return
+    const io = new IntersectionObserver(
+      (entries) => {
+        let best: { page: number; ratio: number } | null = null
+        for (const e of entries) {
+          const page = Number(
+            (e.target as HTMLElement).dataset.page ?? "0",
+          )
+          if (!page) continue
+          if (!best || e.intersectionRatio > best.ratio) {
+            best = { page, ratio: e.intersectionRatio }
+          }
+        }
+        if (best && best.ratio > 0) setActivePage(best.page)
+      },
+      { threshold: [0, 0.25, 0.5, 0.75, 1] },
+    )
+    for (const el of els) io.observe(el)
+    return () => io.disconnect()
+  }, [template.dimensions.pageCount])
+
+  function jumpToPage(p: number) {
+    const el = pageRefs.current[p - 1]
+    if (!el) return
+    el.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
+
   if (template.mapping.strategy !== "coordinates") {
     return (
       <p className="text-sm text-muted-foreground">
@@ -144,15 +188,29 @@ export function FormEditorOverlay({
         onSaveAsTemplate={onSaveAsTemplate}
       />
 
+      {pageCount > 1 && (
+        <PageThumbnailStrip
+          formCode={formCode}
+          pageCount={pageCount}
+          pageImagePrefix={template.page_image_prefix}
+          fieldCountByPage={fieldCountByPage}
+          activePage={activePage}
+          onJump={jumpToPage}
+        />
+      )}
+
       <div className="space-y-6">
         {Array.from({ length: pageCount }, (_, i) => i + 1).map((pageNum) => {
           const entries = byPage[pageNum] ?? []
-          if (entries.length === 0) return null
 
           return (
             <div
               key={pageNum}
-              className="relative mx-auto bg-white rounded-md border shadow-sm overflow-hidden"
+              ref={(el) => {
+                pageRefs.current[pageNum - 1] = el
+              }}
+              data-page={pageNum}
+              className="relative mx-auto bg-white rounded-md border shadow-sm overflow-hidden scroll-mt-20"
               style={{ width: displayWidth, height: displayHeight }}
             >
               <img
@@ -193,6 +251,64 @@ export function FormEditorOverlay({
           )
         })}
       </div>
+    </div>
+  )
+}
+
+function PageThumbnailStrip({
+  formCode,
+  pageCount,
+  pageImagePrefix,
+  fieldCountByPage,
+  activePage,
+  onJump,
+}: {
+  formCode: string
+  pageCount: number
+  pageImagePrefix: string
+  fieldCountByPage: Record<number, number>
+  activePage: number
+  onJump: (page: number) => void
+}) {
+  return (
+    <div className="sticky top-0 z-10 -mx-1 flex gap-2 overflow-x-auto rounded-md border bg-background/95 backdrop-blur px-2 py-2">
+      <span className="self-center shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground pr-1">
+        Pages
+      </span>
+      {Array.from({ length: pageCount }, (_, i) => i + 1).map((p) => {
+        const count = fieldCountByPage[p] ?? 0
+        const isActive = activePage === p
+        return (
+          <button
+            key={p}
+            type="button"
+            onClick={() => onJump(p)}
+            aria-label={`Jump to page ${p}`}
+            aria-current={isActive ? "page" : undefined}
+            className={cn(
+              "relative shrink-0 rounded-md border-2 overflow-hidden bg-white transition-all hover:border-foreground/60 focus:outline-none focus:border-foreground/60",
+              isActive ? "border-foreground" : "border-transparent shadow-sm",
+            )}
+            style={{ width: 64 }}
+          >
+            <img
+              src={`${pageImagePrefix}-${p}.png`}
+              alt={`${formCode} page ${p} thumbnail`}
+              draggable={false}
+              className="block select-none pointer-events-none"
+              style={{ width: "100%", height: "auto" }}
+            />
+            <span className="absolute inset-x-0 bottom-0 bg-foreground/80 text-background text-[9px] leading-none py-0.5 flex items-center justify-center gap-1">
+              <span>P{p}</span>
+              {count > 0 && (
+                <span className="rounded-full bg-background/30 px-1 text-[8px]">
+                  {count}
+                </span>
+              )}
+            </span>
+          </button>
+        )
+      })}
     </div>
   )
 }
