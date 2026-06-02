@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/db/server"
 import { Bell, Building2, CalendarClock } from "lucide-react"
 import { RecomputeRemindersButton } from "@/components/reminders/recompute-button"
+import { ReminderActions } from "@/components/reminders/reminder-actions"
 
 type Reminder = {
   id: string
@@ -109,6 +110,7 @@ export default async function RemindersPage() {
                       <span className={`text-xs border rounded px-2 py-0.5 ${toneCls}`}>
                         {rel.label}
                       </span>
+                      <ReminderActions reminderId={r.id} />
                     </li>
                   )
                 })}
