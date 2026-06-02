@@ -1,9 +1,12 @@
 import Link from "next/link"
+import type { Metadata } from "next"
 import { createClient } from "@/lib/db/server"
 import { CreateCompanyDialog } from "@/components/forms/create-company-dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Building2, User } from "lucide-react"
 import type { Company } from "@/types"
+
+export const metadata: Metadata = { title: "Companies" }
 
 export default async function CompaniesPage() {
   const supabase = await createClient()

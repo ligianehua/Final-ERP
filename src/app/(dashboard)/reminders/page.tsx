@@ -1,7 +1,10 @@
+import type { Metadata } from "next"
 import { createClient } from "@/lib/db/server"
 import { Bell, Building2, CalendarClock } from "lucide-react"
 import { RecomputeRemindersButton } from "@/components/reminders/recompute-button"
 import { ReminderActions } from "@/components/reminders/reminder-actions"
+
+export const metadata: Metadata = { title: "Reminders" }
 
 type Reminder = {
   id: string

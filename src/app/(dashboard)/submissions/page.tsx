@@ -1,7 +1,10 @@
+import type { Metadata } from "next"
 import { createClient } from "@/lib/db/server"
 import { getFormSchema } from "@/lib/forms/registry"
 import { SubmissionActions } from "@/components/submissions/submission-actions"
 import { FileText, History as HistoryIcon } from "lucide-react"
+
+export const metadata: Metadata = { title: "History" }
 
 type Submission = {
   id: string

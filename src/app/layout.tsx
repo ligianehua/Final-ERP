@@ -12,9 +12,31 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://getquill.ai"
+const DESCRIPTION =
+  "Snap a photo of a government form. Get a filled PDF in 60 seconds. BIR, SEC, Mayor's Permit — automated."
+
 export const metadata: Metadata = {
-  title: "Quill · 翎 — AI Permit Advisor for Philippine SMEs",
-  description: "Snap a photo of a government form. Get a filled PDF in 60 seconds. BIR, SEC, Mayor's Permit — automated.",
+  metadataBase: new URL(APP_URL),
+  title: {
+    default: "Quill · 翎 — AI Permit Advisor for Philippine SMEs",
+    template: "%s · Quill",
+  },
+  description: DESCRIPTION,
+  applicationName: "Quill",
+  authors: [{ name: "Quill" }],
+  openGraph: {
+    type: "website",
+    siteName: "Quill",
+    title: "Quill · 翎 — AI Permit Advisor for Philippine SMEs",
+    description: DESCRIPTION,
+    url: "/",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Quill · 翎",
+    description: DESCRIPTION,
+  },
 };
 
 export default function RootLayout({

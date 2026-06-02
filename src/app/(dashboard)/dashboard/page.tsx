@@ -1,4 +1,5 @@
 import Link from "next/link"
+import type { Metadata } from "next"
 import { createClient } from "@/lib/db/server"
 import {
   Activity,
@@ -10,6 +11,8 @@ import {
 } from "lucide-react"
 import { getFormSchema } from "@/lib/forms/registry"
 import { DOCUMENT_TYPE_LABELS } from "@/lib/validations/document"
+
+export const metadata: Metadata = { title: "Dashboard" }
 
 type Reminder = {
   id: string

@@ -1,7 +1,10 @@
+import type { Metadata } from "next"
 import { createClient } from "@/lib/db/server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { FormRecognizer } from "@/components/forms/form-recognizer"
 import { FileCheck } from "lucide-react"
+
+export const metadata: Metadata = { title: "Forms" }
 
 type FormTemplate = {
   id: string
