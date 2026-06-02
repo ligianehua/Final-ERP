@@ -6,7 +6,7 @@ import { Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { NavLinks } from "./nav-links"
 
-export function MobileNav() {
+export function MobileNav({ isAdmin = false }: { isAdmin?: boolean }) {
   const [open, setOpen] = useState(false)
   const pathname = usePathname()
 
@@ -62,7 +62,7 @@ export function MobileNav() {
                 <X className="size-5" />
               </button>
             </div>
-            <NavLinks />
+            <NavLinks isAdmin={isAdmin} />
           </aside>
         </div>
       )}

@@ -21,9 +21,24 @@ const coordSpec = z.object({
   maxWidth: z.number().finite().optional(),
 })
 
-const patchSchema = z.object({
-  field_mapping: z.record(z.string(), coordSpec),
-})
+const patchSchema = z
+  .object({
+    /** Replace the coord map (the "Save as template default" path). */
+    field_mapping: z.record(z.string(), coordSpec).optional(),
+    /** Plain-old metadata edits from the admin detail page. */
+    form_name: z.string().min(1).max(200).optional(),
+    agency: z.string().min(1).max(100).optional(),
+    frequency: z
+      .enum(["monthly", "annual", "per_payment", "quarterly"])
+      .nullable()
+      .optional(),
+    description: z.string().max(2000).nullable().optional(),
+    is_active: z.boolean().optional(),
+    source_url: z.string().url().nullable().optional(),
+  })
+  .refine((d) => Object.keys(d).length > 0, {
+    message: "Nothing to update",
+  })
 
 // GET /api/forms/templates/[form_code]
 // Returns the effective template config (DB-overridden if present, else
@@ -32,7 +47,9 @@ const patchSchema = z.object({
 export async function GET(_request: Request, { params }: Params) {
   const { form_code } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
@@ -49,23 +66,25 @@ export async function GET(_request: Request, { params }: Params) {
 }
 
 // PATCH /api/forms/templates/[form_code]
-// Admin-only: replaces the template's field_mapping. The caller is
-// expected to pass the merged (base + overrides) coordinate map.
+// Admin-only. Three flavours of edit, freely mixable:
+//   - field_mapping: rebake the coord map ("Save as template default").
+//   - metadata: form_name / agency / frequency / description / is_active
+//                / source_url (whatever the admin detail page lets edit).
+//
+// Either path is allowed for code-side templates (BIR_2550M etc.) — the
+// row may not exist yet, so we UPSERT instead of UPDATE so the first
+// edit auto-creates the DB shadow.
 export async function PATCH(request: Request, { params }: Params) {
   const { form_code } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
   if (!isAdminEmail(user.email)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-  }
-
-  // Form must exist in the code-side registry (we don't allow saving
-  // layouts for forms Quill doesn't know how to fill).
-  if (!getTemplateConfig(form_code)) {
-    return NextResponse.json({ error: "Unknown form_code" }, { status: 404 })
   }
 
   let body: unknown
@@ -82,12 +101,89 @@ export async function PATCH(request: Request, { params }: Params) {
     )
   }
 
+  // form_code must be known to the catalog one way or another (code OR
+  // a DB-only template).
+  const { data: existing } = await supabase
+    .from("form_templates")
+    .select("form_code, form_name, agency")
+    .eq("form_code", form_code)
+    .maybeSingle()
+  if (!existing && !getTemplateConfig(form_code)) {
+    return NextResponse.json({ error: "Unknown form_code" }, { status: 404 })
+  }
+
+  // UPSERT — first admin edit of a code-shipped template inserts the
+  // shadow row; subsequent edits update it. Code-side metadata fills
+  // any required NOT NULL columns when we insert fresh.
+  const codeBase = getTemplateConfig(form_code)
+  const payload: Record<string, unknown> = {
+    form_code,
+    form_name: parsed.data.form_name ?? existing?.form_name ?? form_code,
+    agency:
+      parsed.data.agency ?? existing?.agency ?? (codeBase ? "" : ""),
+    ...parsed.data,
+  }
+
   const { error } = await supabase
     .from("form_templates")
-    .update({ field_mapping: parsed.data.field_mapping })
-    .eq("form_code", form_code)
+    .upsert(payload, { onConflict: "form_code" })
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+  return NextResponse.json({ success: true })
+}
+
+// DELETE /api/forms/templates/[form_code]
+// Admin-only. Removes the DB row plus any Storage objects owned by it.
+// For code-shipped templates this just reverts to the factory defaults;
+// for DB-only templates it actually removes the form from the catalog.
+export async function DELETE(_request: Request, { params }: Params) {
+  const { form_code } = await params
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+  if (!isAdminEmail(user.email)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+
+  // Get the storage paths so we can clean them up after deleting the row.
+  const { data: row } = await supabase
+    .from("form_templates")
+    .select("pdf_storage_path, png_storage_prefix")
+    .eq("form_code", form_code)
+    .maybeSingle()
+
+  const { error: deleteError } = await supabase
+    .from("form_templates")
+    .delete()
+    .eq("form_code", form_code)
+  if (deleteError) {
+    return NextResponse.json({ error: deleteError.message }, { status: 500 })
+  }
+
+  // Best-effort cleanup of Storage assets. Leaving orphans is acceptable
+  // (a future GC job could sweep) but it's polite to clean up now.
+  if (row?.pdf_storage_path) {
+    await supabase.storage
+      .from("templates")
+      .remove([row.pdf_storage_path])
+      .catch(() => {})
+  }
+  if (row?.png_storage_prefix) {
+    const { data: list } = await supabase.storage
+      .from("templates")
+      .list(row.png_storage_prefix)
+    if (list && list.length > 0) {
+      await supabase.storage
+        .from("templates")
+        .remove(list.map((f) => `${row.png_storage_prefix}/${f.name}`))
+        .catch(() => {})
+    }
+  }
+
   return NextResponse.json({ success: true })
 }
