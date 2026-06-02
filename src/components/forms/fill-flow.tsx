@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { CheckCircle2, AlertCircle, Loader2, Save, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { FormEditorOverlay } from "./form-editor-overlay"
+import { VATExtractor } from "./vat-extractor"
 import type {
   CoordSpec,
   FieldOverrides,
@@ -435,6 +436,20 @@ export function FillFlow({
           </div>
         </CardContent>
       </Card>
+
+      {formCode === "BIR_2550M" && (
+        <VATExtractor
+          onApply={(fields) => {
+            // Apply each extracted field through setVal so the L1 formula
+            // cascade runs (e.g. setting gross_sales auto-fills output_tax
+            // and then vat_payable).
+            if (fields.gross_sales) setVal("gross_sales", fields.gross_sales)
+            if (fields.output_tax) setVal("output_tax", fields.output_tax)
+            if (fields.input_tax) setVal("input_tax", fields.input_tax)
+            if (fields.vat_payable) setVal("vat_payable", fields.vat_payable)
+          }}
+        />
+      )}
 
       {(() => {
         const useVisualEditor =
