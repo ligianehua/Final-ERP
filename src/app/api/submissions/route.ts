@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { createClient } from "@/lib/db/server"
-import { getFormSchema } from "@/lib/forms/registry"
+import { getEffectiveFormSchema } from "@/lib/forms/registry-effective"
 
 const overrideSchema = z.object({
   dx: z.number().finite(),
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     )
   }
 
-  if (!getFormSchema(parsed.data.form_code)) {
+  if (!(await getEffectiveFormSchema(parsed.data.form_code))) {
     return NextResponse.json({ error: "Unsupported form_code" }, { status: 400 })
   }
 

@@ -1,8 +1,11 @@
+import Link from "next/link"
 import type { Metadata } from "next"
 import { createClient } from "@/lib/db/server"
+import { isAdminEmail } from "@/lib/auth/admin"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { FormRecognizer } from "@/components/forms/form-recognizer"
-import { FileCheck } from "lucide-react"
+import { FileCheck, Plus } from "lucide-react"
 
 export const metadata: Metadata = { title: "Forms" }
 
@@ -23,6 +26,11 @@ const FREQUENCY_LABELS: Record<string, string> = {
 
 export default async function FormsPage() {
   const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  const isAdmin = isAdminEmail(user?.email)
+
   const { data } = await supabase
     .from("form_templates")
     .select("id, form_code, form_name, agency, frequency")
@@ -33,11 +41,21 @@ export default async function FormsPage() {
 
   return (
     <div className="max-w-5xl mx-auto p-6 md:p-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight">Forms</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Upload a photo of a blank government form — Quill identifies which form it is.
-        </p>
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Forms</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Upload a photo of a blank government form — Quill identifies which form it is.
+          </p>
+        </div>
+        {isAdmin && (
+          <Button asChild size="sm" variant="outline" className="gap-2 shrink-0">
+            <Link href="/admin/templates/new">
+              <Plus className="size-4" />
+              Add a template
+            </Link>
+          </Button>
+        )}
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">

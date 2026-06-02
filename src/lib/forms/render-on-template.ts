@@ -6,6 +6,7 @@ import {
 } from "pdf-lib"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
+import { createAdminClient } from "@/lib/db/admin"
 import type {
   AcroFormMapping,
   CoordSpec,
@@ -31,6 +32,34 @@ export type RenderInput = {
   values: Record<string, string | null>
   /** Per-submission drag adjustments applied on top of the template. */
   overrides?: FieldOverrides
+}
+
+/**
+ * Load the template PDF either from the project filesystem
+ * (code-shipped templates under `public/form-templates/`) or from
+ * Supabase Storage (admin-uploaded templates under the `templates`
+ * bucket). The TemplateConfig's `storage_bucket` is the selector.
+ */
+async function loadTemplateBytes(
+  template: TemplateConfig,
+): Promise<Uint8Array> {
+  if (!template.storage_bucket) {
+    return new Uint8Array(
+      await readFile(join(process.cwd(), template.pdf_path)),
+    )
+  }
+  // Service role: skip RLS, works inside cron/anonymous PDF-generation
+  // paths as well as authenticated user requests.
+  const admin = createAdminClient()
+  const { data, error } = await admin.storage
+    .from(template.storage_bucket)
+    .download(template.pdf_path)
+  if (error || !data) {
+    throw new Error(
+      `Storage fetch failed for ${template.storage_bucket}/${template.pdf_path}: ${error?.message ?? "no data"}`,
+    )
+  }
+  return new Uint8Array(await data.arrayBuffer())
 }
 
 /**
@@ -63,7 +92,7 @@ export async function renderOnTemplate({
   values,
   overrides = {},
 }: RenderInput): Promise<Uint8Array> {
-  const bytes = await readFile(join(process.cwd(), template.pdf_path))
+  const bytes = await loadTemplateBytes(template)
   const pdf = await PDFDocument.load(bytes)
   pdf.setProducer("Quill")
 

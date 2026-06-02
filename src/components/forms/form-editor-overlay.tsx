@@ -7,6 +7,7 @@ import type {
   CoordSpec,
   FieldOverrides,
   TemplateConfig,
+  TemplateDimensions,
 } from "@/lib/forms/template-types"
 
 type Field = {
@@ -15,9 +16,20 @@ type Field = {
   required: boolean
 }
 
+/**
+ * Shape passed from the server to the editor. `page_image_prefix` is
+ * appended with `-1.png`, `-2.png`, etc. — points at /public for
+ * code-side templates, at the Storage CDN URL for DB-only ones.
+ */
+export type EditorTemplate = {
+  dimensions: TemplateDimensions
+  mapping: TemplateConfig["mapping"]
+  page_image_prefix: string
+}
+
 type Props = {
   formCode: string
-  template: Omit<TemplateConfig, "transformValues">
+  template: EditorTemplate
   fields: Field[]
   values: Record<string, string>
   /** Called when the user edits a slot. `id` is the coord-map key. */
@@ -71,11 +83,6 @@ function writeVirtual(
   return false
 }
 
-function baseNameFromPath(pdfPath: string): string {
-  const file = pdfPath.split("/").pop() ?? ""
-  return file.replace(/\.pdf$/i, "")
-}
-
 export function FormEditorOverlay({
   formCode,
   template,
@@ -117,7 +124,6 @@ export function FormEditorOverlay({
   const { width: pdfW, height: pdfH, pageCount } = template.dimensions
   const scale = displayWidth / pdfW
   const displayHeight = pdfH * scale
-  const baseName = baseNameFromPath(template.pdf_path)
 
   const isRequiredMissing = (id: string, val: string) => {
     if (val.trim() !== "") return false
@@ -150,7 +156,7 @@ export function FormEditorOverlay({
               style={{ width: displayWidth, height: displayHeight }}
             >
               <img
-                src={`/form-templates/${baseName}-${pageNum}.png`}
+                src={`${template.page_image_prefix}-${pageNum}.png`}
                 alt={`${formCode} page ${pageNum}`}
                 width={displayWidth}
                 height={displayHeight}

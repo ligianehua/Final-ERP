@@ -43,7 +43,7 @@ export async function GET(_request: Request, { params }: Params) {
   }
 
   return NextResponse.json({
-    template: serializeTemplate(template),
+    template: serializeTemplate(form_code, template),
     is_admin: isAdminEmail(user.email),
   })
 }

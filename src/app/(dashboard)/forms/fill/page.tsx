@@ -33,7 +33,7 @@ export default async function FillFormPage({
   // Effective coord-map: DB override if an admin has saved one, else
   // the factory default from src/lib/forms/templates/<form>.ts.
   const effective = await getEffectiveTemplate(form_code)
-  const template = effective ? serializeTemplate(effective) : null
+  const template = effective ? serializeTemplate(form_code, effective) : null
 
   let initial: InitialSubmission | undefined
   if (submission_id) {

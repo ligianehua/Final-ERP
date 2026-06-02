@@ -52,8 +52,16 @@ export type TemplateDimensions = {
 }
 
 export type TemplateConfig = {
-  /** Path to the template PDF, relative to project root. */
+  /**
+   * Either:
+   *   - A filesystem path relative to the project root, for code-shipped
+   *     templates baked under `public/form-templates/`, OR
+   *   - A Storage bucket key, when `storage_bucket` is also set (used
+   *     for templates uploaded by admins via /admin/templates/new).
+   */
   pdf_path: string
+  /** When set, `pdf_path` resolves inside this Supabase Storage bucket. */
+  storage_bucket?: string
   /** Page dimensions and count — required for the WYSIWYG editor. */
   dimensions: TemplateDimensions
   mapping: AcroFormMapping | CoordinateMapping

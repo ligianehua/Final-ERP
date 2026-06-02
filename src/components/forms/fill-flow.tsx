@@ -8,7 +8,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { CheckCircle2, AlertCircle, Loader2, Save, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { FormEditorOverlay } from "./form-editor-overlay"
+import {
+  FormEditorOverlay,
+  type EditorTemplate,
+} from "./form-editor-overlay"
 import { VATExtractor } from "./vat-extractor"
 import {
   ArchiveSyncDialog,
@@ -17,10 +20,9 @@ import {
 import type {
   CoordSpec,
   FieldOverrides,
-  TemplateConfig,
 } from "@/lib/forms/template-types"
 
-type SerializableTemplate = Omit<TemplateConfig, "transformValues">
+type SerializableTemplate = EditorTemplate
 
 
 type FilledField = {

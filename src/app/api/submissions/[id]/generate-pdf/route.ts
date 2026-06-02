@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/db/server"
-import { getFormSchema } from "@/lib/forms/registry"
+import { getEffectiveFormSchema } from "@/lib/forms/registry-effective"
 import { generateFormPDF } from "@/lib/forms/generate-pdf"
 
 type Params = { params: Promise<{ id: string }> }
@@ -27,7 +27,7 @@ export async function POST(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "Submission not found" }, { status: 404 })
   }
 
-  const schema = getFormSchema(sub.form_code)
+  const schema = await getEffectiveFormSchema(sub.form_code)
   if (!schema) {
     return NextResponse.json(
       { error: `No PDF template for ${sub.form_code}` },

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { createClient } from "@/lib/db/server"
-import { getFormSchema } from "@/lib/forms/registry"
+import { getEffectiveFormSchema } from "@/lib/forms/registry-effective"
 import { fillFromArchive } from "@/lib/forms/fill"
 import type { Company, CompanyPerson } from "@/types"
 
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const schema = getFormSchema(parsed.data.form_code)
+  const schema = await getEffectiveFormSchema(parsed.data.form_code)
   if (!schema) {
     return NextResponse.json(
       { error: `Form ${parsed.data.form_code} cannot be filled yet (no field schema).` },
