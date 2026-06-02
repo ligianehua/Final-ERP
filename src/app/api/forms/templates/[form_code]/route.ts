@@ -21,10 +21,28 @@ const coordSpec = z.object({
   maxWidth: z.number().finite().optional(),
 })
 
+const fieldSchemaEntry = z.object({
+  id: z.string().regex(/^[a-z][a-z0-9_]*$/).min(1).max(60),
+  label: z.string().min(1).max(200),
+  semantic_type: z.string().min(1).max(60),
+  data_source: z.string().nullable(),
+  required: z.boolean(),
+  period_specific: z.boolean().optional(),
+})
+
+const fieldSchemaPayload = z.object({
+  form_code: z.string().optional(),
+  form_name: z.string().optional(),
+  agency: z.string().optional(),
+  fields: z.array(fieldSchemaEntry),
+})
+
 const patchSchema = z
   .object({
     /** Replace the coord map (the "Save as template default" path). */
     field_mapping: z.record(z.string(), coordSpec).optional(),
+    /** Replace the field schema. Server reconciles field_mapping for us. */
+    field_schema: fieldSchemaPayload.optional(),
     /** Plain-old metadata edits from the admin detail page. */
     form_name: z.string().min(1).max(200).optional(),
     agency: z.string().min(1).max(100).optional(),
@@ -105,11 +123,39 @@ export async function PATCH(request: Request, { params }: Params) {
   // a DB-only template).
   const { data: existing } = await supabase
     .from("form_templates")
-    .select("form_code, form_name, agency")
+    .select(
+      "form_code, form_name, agency, dimensions, field_mapping",
+    )
     .eq("form_code", form_code)
     .maybeSingle()
   if (!existing && !getTemplateConfig(form_code)) {
     return NextResponse.json({ error: "Unknown form_code" }, { status: 404 })
+  }
+
+  // If field_schema is being edited, reconcile field_mapping so every
+  // field has a CoordSpec. New fields get a sensible default position
+  // (stacked vertically near the top of page 1) — admin can drag to
+  // the right spot in layout mode afterwards. Dropped fields lose
+  // their mapping entry to avoid orphan boxes.
+  let reconciledMapping: Record<string, unknown> | undefined
+  if (parsed.data.field_schema) {
+    const dims = (existing?.dimensions ?? {
+      width: 612,
+      height: 792,
+    }) as { width: number; height: number }
+    const oldMap = (existing?.field_mapping ?? {}) as Record<string, unknown>
+    const newMap: Record<string, unknown> = {}
+    parsed.data.field_schema.fields.forEach((f, idx) => {
+      newMap[f.id] = oldMap[f.id] ?? {
+        page: 1,
+        x: 50,
+        y: Math.max(50, dims.height - 100 - idx * 22),
+        width: 200,
+        height: 14,
+        size: 10,
+      }
+    })
+    reconciledMapping = newMap
   }
 
   // UPSERT — first admin edit of a code-shipped template inserts the
@@ -122,6 +168,9 @@ export async function PATCH(request: Request, { params }: Params) {
     agency:
       parsed.data.agency ?? existing?.agency ?? (codeBase ? "" : ""),
     ...parsed.data,
+  }
+  if (reconciledMapping) {
+    payload.field_mapping = parsed.data.field_mapping ?? reconciledMapping
   }
 
   const { error } = await supabase

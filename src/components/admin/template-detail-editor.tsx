@@ -17,6 +17,7 @@ import {
   FormEditorOverlay,
   type EditorTemplate,
 } from "@/components/forms/form-editor-overlay"
+import { FieldSchemaEditor } from "@/components/admin/field-schema-editor"
 import { toast } from "@/components/ui/toaster"
 import type { FieldOverrides, CoordSpec } from "@/lib/forms/template-types"
 
@@ -329,7 +330,7 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
         </Card>
       )}
 
-      {/* Field schema (read-only for now) */}
+      {/* Field schema (editable) */}
       {fieldSchema && (
         <Card>
           <CardHeader className="pb-3">
@@ -337,49 +338,18 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
               Fields ({fieldSchema.fields.length})
             </CardTitle>
             <p className="text-xs text-muted-foreground">
-              The data model for this template. Editing field metadata is
-              coming — for now, re-upload to change it.
+              Add, rename, retype, or remove fields. New fields get a
+              default position you can drag-correct in the Layout panel
+              above; removed fields disappear from the WYSIWYG editor too.
             </p>
           </CardHeader>
-          <CardContent className="p-0">
-            <table className="w-full text-xs">
-              <thead className="bg-muted/40 text-muted-foreground">
-                <tr>
-                  <th className="text-left px-3 py-2 font-medium">ID</th>
-                  <th className="text-left px-3 py-2 font-medium">Label</th>
-                  <th className="text-left px-3 py-2 font-medium">Semantic</th>
-                  <th className="text-left px-3 py-2 font-medium">Source</th>
-                  <th className="text-center px-3 py-2 font-medium">Req</th>
-                  <th className="text-center px-3 py-2 font-medium">Period</th>
-                </tr>
-              </thead>
-              <tbody>
-                {fieldSchema.fields.map((f) => (
-                  <tr key={f.id} className="border-t">
-                    <td className="px-3 py-2 font-mono text-[11px]">{f.id}</td>
-                    <td className="px-3 py-2">{f.label}</td>
-                    <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">
-                      {f.semantic_type}
-                    </td>
-                    <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">
-                      {f.data_source ?? "—"}
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      {f.required && (
-                        <CheckCircle2 className="size-3.5 text-foreground inline" />
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      {f.period_specific && (
-                        <span className="text-[10px] text-muted-foreground">
-                          •
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <CardContent>
+            <FieldSchemaEditor
+              formCode={meta.form_code}
+              formName={meta.form_name}
+              agency={meta.agency}
+              initialFields={fieldSchema.fields}
+            />
           </CardContent>
         </Card>
       )}
