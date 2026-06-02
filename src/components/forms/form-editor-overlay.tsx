@@ -1,8 +1,21 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Loader2, Move, RotateCcw, Save, Type } from "lucide-react"
+import { Loader2, Move, Plus, RotateCcw, Save, Type } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { toast } from "@/components/ui/toaster"
 import type {
   CoordSpec,
   FieldOverrides,
@@ -45,7 +58,48 @@ type Props = {
   isAdmin?: boolean
   /** Persist current overrides as the new template default. */
   onSaveAsTemplate?: () => Promise<{ ok: boolean; message: string }>
+  /**
+   * Admin path: right-click on the PDF in layout mode → add a new
+   * field at that exact PDF coordinate. Receiver is responsible for
+   * persisting via PATCH /api/forms/templates/[form_code].
+   */
+  onAddField?: (spec: NewFieldRequest) => Promise<{
+    ok: boolean
+    message: string
+  }>
 }
+
+/** Coords are in PDF points (top-down click position). The receiver
+ * converts to pdf-lib bottom-up baseline-y when persisting. */
+export type NewFieldRequest = {
+  page: number
+  /** PDF point coords of the click. */
+  x: number
+  y_top: number
+  label: string
+  semantic_type: string
+  data_source: string | null
+  required: boolean
+}
+
+const SEMANTIC_TYPES = [
+  "company_name",
+  "company_tin",
+  "company_sec_no",
+  "company_dti_no",
+  "company_address",
+  "company_city",
+  "company_phone",
+  "company_email",
+  "company_vat_status",
+  "period_month",
+  "period_year",
+  "amount",
+  "signatory_name",
+  "signatory_tin",
+  "signatory_position",
+  "text",
+]
 
 type EditMode = "values" | "layout"
 
@@ -93,9 +147,21 @@ export function FormEditorOverlay({
   onOverrideChange,
   isAdmin = false,
   onSaveAsTemplate,
+  onAddField,
 }: Props) {
   const [displayWidth] = useState(MAX_DISPLAY_WIDTH)
   const [mode, setMode] = useState<EditMode>("values")
+  const canRightClickAdd = isAdmin && mode === "layout" && !!onAddField
+  const [pendingAdd, setPendingAdd] = useState<{
+    page: number
+    x_pdf: number
+    y_top_pdf: number
+  } | null>(null)
+  const [pendingLabel, setPendingLabel] = useState("")
+  const [pendingType, setPendingType] = useState("text")
+  const [pendingSource, setPendingSource] = useState("")
+  const [pendingRequired, setPendingRequired] = useState(false)
+  const [adding, setAdding] = useState(false)
 
   const labelOf = useMemo(() => {
     const m = new Map<string, string>()
@@ -210,6 +276,20 @@ export function FormEditorOverlay({
                 pageRefs.current[pageNum - 1] = el
               }}
               data-page={pageNum}
+              onContextMenu={(e) => {
+                if (!canRightClickAdd) return
+                e.preventDefault()
+                const rect = e.currentTarget.getBoundingClientRect()
+                setPendingAdd({
+                  page: pageNum,
+                  x_pdf: (e.clientX - rect.left) / scale,
+                  y_top_pdf: (e.clientY - rect.top) / scale,
+                })
+                setPendingLabel("")
+                setPendingType("text")
+                setPendingSource("")
+                setPendingRequired(false)
+              }}
               className="relative mx-auto bg-white rounded-md border shadow-sm overflow-hidden scroll-mt-20"
               style={{ width: displayWidth, height: displayHeight }}
             >
@@ -244,13 +324,163 @@ export function FormEditorOverlay({
                 />
               ))}
 
+              {canRightClickAdd && pendingAdd?.page === pageNum && (
+                <div
+                  className="absolute pointer-events-none border-2 border-primary rounded-sm bg-primary/10"
+                  style={{
+                    left: pendingAdd.x_pdf * scale,
+                    top: pendingAdd.y_top_pdf * scale,
+                    width: 160 * scale,
+                    height: 14 * scale,
+                  }}
+                />
+              )}
+
               <div className="absolute bottom-2 right-3 text-[10px] text-muted-foreground bg-white/80 px-1.5 py-0.5 rounded">
                 Page {pageNum} of {pageCount}
+                {canRightClickAdd && (
+                  <span className="ml-2 text-primary">
+                    · right-click to add field
+                  </span>
+                )}
               </div>
             </div>
           )
         })}
       </div>
+
+      <Dialog
+        open={pendingAdd !== null && !adding}
+        onOpenChange={(o) => {
+          if (!o) setPendingAdd(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="inline-flex items-center gap-2">
+              <Plus className="size-4 text-primary" />
+              Add field at clicked position
+            </DialogTitle>
+            <DialogDescription>
+              Page <span className="font-mono">{pendingAdd?.page}</span>{" "}
+              at PDF point{" "}
+              <span className="font-mono">
+                ({pendingAdd?.x_pdf.toFixed(0)},{" "}
+                {pendingAdd?.y_top_pdf.toFixed(0)})
+              </span>
+              . You can drag-tune it after saving.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="new_label" className="text-xs">
+                Label
+              </Label>
+              <Input
+                id="new_label"
+                value={pendingLabel}
+                onChange={(e) => setPendingLabel(e.target.value)}
+                placeholder="TIN, Amount, Signature, etc."
+                autoFocus
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="new_type" className="text-xs">
+                  Semantic type
+                </Label>
+                <select
+                  id="new_type"
+                  value={pendingType}
+                  onChange={(e) => setPendingType(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  {SEMANTIC_TYPES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="new_source" className="text-xs">
+                  Data source (optional)
+                </Label>
+                <Input
+                  id="new_source"
+                  value={pendingSource}
+                  onChange={(e) => setPendingSource(e.target.value)}
+                  placeholder="company.tin"
+                  className="font-mono text-xs"
+                />
+              </div>
+            </div>
+            <label className="inline-flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={pendingRequired}
+                onChange={(e) => setPendingRequired(e.target.checked)}
+                className="size-3.5"
+              />
+              <span>Required</span>
+            </label>
+          </div>
+          <DialogFooter className="gap-2">
+            <DialogClose asChild>
+              <Button variant="outline" disabled={adding}>
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button
+              onClick={async () => {
+                if (!pendingAdd || !onAddField) return
+                if (!pendingLabel.trim()) {
+                  toast({
+                    variant: "destructive",
+                    title: "Label required",
+                    description: "Give the field a label first.",
+                  })
+                  return
+                }
+                setAdding(true)
+                const result = await onAddField({
+                  page: pendingAdd.page,
+                  x: pendingAdd.x_pdf,
+                  y_top: pendingAdd.y_top_pdf,
+                  label: pendingLabel.trim(),
+                  semantic_type: pendingType,
+                  data_source: pendingSource.trim() || null,
+                  required: pendingRequired,
+                })
+                setAdding(false)
+                if (result.ok) {
+                  setPendingAdd(null)
+                  toast({
+                    variant: "success",
+                    title: "Field added",
+                    description: result.message,
+                  })
+                } else {
+                  toast({
+                    variant: "destructive",
+                    title: "Add failed",
+                    description: result.message,
+                  })
+                }
+              }}
+              disabled={adding || !pendingLabel.trim()}
+              className="gap-2"
+            >
+              {adding ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Plus className="size-4" />
+              )}
+              Add field
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -16,11 +16,28 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   FormEditorOverlay,
   type EditorTemplate,
+  type NewFieldRequest,
 } from "@/components/forms/form-editor-overlay"
 import { FieldSchemaEditor } from "@/components/admin/field-schema-editor"
 import { ReplacePdfButton } from "@/components/admin/replace-pdf-button"
+import { ReanalyzeAIButton } from "@/components/admin/reanalyze-ai-button"
 import { toast } from "@/components/ui/toaster"
 import type { FieldOverrides, CoordSpec } from "@/lib/forms/template-types"
+
+function slugifyId(label: string, existing: Set<string>): string {
+  const base =
+    label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 40) || "field"
+  if (!existing.has(base)) return base
+  for (let i = 2; i < 1000; i++) {
+    const candidate = `${base}_${i}`
+    if (!existing.has(candidate)) return candidate
+  }
+  return `${base}_${Date.now()}`
+}
 
 type FieldSchema = {
   form_code: string
@@ -110,6 +127,81 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
     }
     toast({ variant: "success", title: "Metadata saved" })
     router.refresh()
+  }
+
+  async function addFieldAtPosition(
+    spec: NewFieldRequest,
+  ): Promise<{ ok: boolean; message: string }> {
+    if (!fieldSchema) {
+      return { ok: false, message: "No schema to add to" }
+    }
+    if (template.mapping.strategy !== "coordinates") {
+      return { ok: false, message: "Not a coordinate template" }
+    }
+
+    // Pick an id that doesn't collide with anything already in the
+    // schema (the coord-map keys mirror the schema ids).
+    const existingIds = new Set(fieldSchema.fields.map((f) => f.id))
+    const newId = slugifyId(spec.label, existingIds)
+
+    // Default box geometry — admin can drag-tune in Layout mode.
+    const width = 160
+    const height = 14
+    const size = 10
+    // Top-down click → pdf-lib baseline-y (bottom-up).
+    const baselineY =
+      template.dimensions.height - spec.y_top - height + 1
+
+    const isPeriodSpec =
+      spec.semantic_type === "period_month" ||
+      spec.semantic_type === "period_year"
+
+    const newSchemaFields = [
+      ...fieldSchema.fields,
+      {
+        id: newId,
+        label: spec.label,
+        semantic_type: spec.semantic_type,
+        data_source: spec.data_source,
+        required: spec.required,
+        period_specific: isPeriodSpec,
+      },
+    ]
+
+    const newMapping: Record<string, CoordSpec> = {
+      ...template.mapping.fields,
+      [newId]: {
+        page: spec.page,
+        x: spec.x,
+        y: baselineY,
+        width,
+        height,
+        size,
+      },
+    }
+
+    const res = await fetch(
+      `/api/forms/templates/${encodeURIComponent(meta.form_code)}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          field_schema: {
+            form_code: meta.form_code,
+            form_name: meta.form_name,
+            agency: meta.agency,
+            fields: newSchemaFields,
+          },
+          field_mapping: newMapping,
+        }),
+      },
+    )
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}))
+      return { ok: false, message: json.error ?? "Save failed" }
+    }
+    router.refresh()
+    return { ok: true, message: `Added "${spec.label}" on page ${spec.page}` }
   }
 
   async function saveLayout(): Promise<{ ok: boolean; message: string }> {
@@ -291,10 +383,22 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
                 writes the new positions to the catalog for everyone.
               </p>
             </div>
-            <ReplacePdfButton
-              formCode={meta.form_code}
-              currentPageCount={template.dimensions.pageCount}
-            />
+            <div className="flex gap-2 shrink-0">
+              {template.mapping.strategy === "coordinates" && (
+                <ReanalyzeAIButton
+                  formCode={meta.form_code}
+                  formName={meta.form_name}
+                  agency={meta.agency}
+                  dimensions={template.dimensions}
+                  existingFields={fieldSchema.fields}
+                  existingMapping={template.mapping.fields}
+                />
+              )}
+              <ReplacePdfButton
+                formCode={meta.form_code}
+                currentPageCount={template.dimensions.pageCount}
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <FormEditorOverlay
@@ -318,6 +422,7 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
               onOverrideChange={setOverride}
               isAdmin
               onSaveAsTemplate={saveLayout}
+              onAddField={addFieldAtPosition}
             />
           </CardContent>
         </Card>
