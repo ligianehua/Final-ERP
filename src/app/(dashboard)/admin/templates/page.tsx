@@ -14,6 +14,7 @@ import { getTemplateConfig } from "@/lib/forms/templates"
 import { Button } from "@/components/ui/button"
 import { TemplateDeleteButton } from "@/components/admin/template-delete-button"
 import { TemplateImportButton } from "@/components/admin/template-import-button"
+import { TemplateBulkExportButton } from "@/components/admin/template-bulk-export-button"
 import { cn } from "@/lib/utils"
 
 export const metadata: Metadata = { title: "Template catalog · Admin" }
@@ -96,7 +97,10 @@ export default async function AdminTemplatesPage() {
             URLs for new versions, or add a new template from scratch.
           </p>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+          <TemplateBulkExportButton
+            exportableCodes={dbRows.map((r) => r.form_code)}
+          />
           <TemplateImportButton />
           <Button asChild size="sm" className="gap-2">
             <Link href="/admin/templates/new">

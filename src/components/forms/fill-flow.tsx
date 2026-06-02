@@ -14,6 +14,34 @@ import {
 } from "./form-editor-overlay"
 import { VATExtractor } from "./vat-extractor"
 import { FormImagePrefill } from "./form-image-prefill"
+
+function draftKey(
+  formCode: string,
+  companyId: string,
+  signatoryId: string | null,
+): string {
+  return `quill:fill-draft:${formCode}:${companyId}:${signatoryId ?? "none"}`
+}
+
+type DraftSnapshot = {
+  saved_at: string
+  values: Record<string, string>
+  overrides: FieldOverrides
+  period: string
+}
+
+function readDraft(key: string): DraftSnapshot | null {
+  if (typeof window === "undefined") return null
+  try {
+    const raw = window.localStorage.getItem(key)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as DraftSnapshot
+    if (!parsed.saved_at || typeof parsed.values !== "object") return null
+    return parsed
+  } catch {
+    return null
+  }
+}
 import {
   ArchiveSyncDialog,
   type SyncCandidate,
@@ -203,6 +231,14 @@ export function FillFlow({
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
   })
 
+  // Draft-restore prompt for the current company+signatory slot. Null
+  // = nothing to restore; non-null = banner is showing.
+  const [pendingDraft, setPendingDraft] = useState<DraftSnapshot | null>(null)
+  // Once the user has restored OR explicitly skipped, we begin writing
+  // new draft snapshots on every change. We don't want to overwrite a
+  // pending-restore with the current archive-only state.
+  const [draftWritable, setDraftWritable] = useState(false)
+
   // Load companies once
   useEffect(() => {
     let active = true
@@ -281,8 +317,65 @@ export function FillFlow({
       }
       setValues(init)
     }
+    // Hold off on writing new drafts until we've offered any existing
+    // one for restore. Doing this on every fill (re-pick company, etc.)
+    // is correct — each combo has its own slot.
+    setDraftWritable(false)
+    const existing = readDraft(draftKey(formCode, cid, json.signatory_id))
+    setPendingDraft(existing)
+    if (!existing) setDraftWritable(true)
     setLoading(false)
   }
+
+  function restoreDraft() {
+    if (!pendingDraft) return
+    setValues(pendingDraft.values)
+    setOverrides(pendingDraft.overrides)
+    if (pendingDraft.period) setPeriod(pendingDraft.period)
+    setPendingDraft(null)
+    setDraftWritable(true)
+  }
+
+  function discardDraft() {
+    if (!companyId) return
+    try {
+      window.localStorage.removeItem(
+        draftKey(formCode, companyId, signatoryId),
+      )
+    } catch {}
+    setPendingDraft(null)
+    setDraftWritable(true)
+  }
+
+  // Debounced autosave once the slot is "writable" (after the restore
+  // prompt has been handled). Skipped on the very first render so the
+  // archive-prefill alone doesn't immediately get persisted as a draft.
+  useEffect(() => {
+    if (!companyId || !draftWritable) return
+    const key = draftKey(formCode, companyId, signatoryId)
+    const timer = setTimeout(() => {
+      try {
+        const snapshot: DraftSnapshot = {
+          saved_at: new Date().toISOString(),
+          values,
+          overrides,
+          period,
+        }
+        window.localStorage.setItem(key, JSON.stringify(snapshot))
+      } catch {
+        // Quota exceeded or private mode — silently fail.
+      }
+    }, 600)
+    return () => clearTimeout(timer)
+  }, [
+    companyId,
+    signatoryId,
+    formCode,
+    values,
+    overrides,
+    period,
+    draftWritable,
+  ])
 
   function setVal(id: string, v: string) {
     setValues((s) => {
@@ -399,6 +492,16 @@ export function FillFlow({
       companyId: data.company.id,
       signatoryId,
     })
+    // Submission saved → wipe the in-progress draft for this slot so
+    // the user doesn't get prompted to restore stale state next time.
+    if (companyId) {
+      try {
+        window.localStorage.removeItem(
+          draftKey(formCode, companyId, signatoryId),
+        )
+      } catch {}
+    }
+
     if (candidates.length > 0) {
       setSyncDialog({ open: true, candidates })
     } else {
@@ -529,6 +632,29 @@ export function FillFlow({
   // Step 2: review filled fields
   return (
     <div className="space-y-6">
+      {pendingDraft && (
+        <div className="rounded-md border bg-amber-50 dark:bg-amber-950/40 px-4 py-3 text-sm flex items-center justify-between gap-3">
+          <div className="flex items-start gap-2">
+            <Save className="size-4 text-amber-700 dark:text-amber-300 mt-0.5 shrink-0" />
+            <div className="text-amber-900 dark:text-amber-100">
+              You have an unsaved draft for this company from{" "}
+              <time className="font-medium">
+                {new Date(pendingDraft.saved_at).toLocaleString()}
+              </time>
+              .
+            </div>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <Button variant="outline" size="sm" onClick={discardDraft}>
+              Discard
+            </Button>
+            <Button size="sm" onClick={restoreDraft}>
+              Restore
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Summary bar */}
       <Card>
         <CardContent className="py-4">

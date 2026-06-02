@@ -52,6 +52,30 @@ export function TemplateImportButton() {
       })
       return
     }
+
+    if (json.bundle) {
+      // Bulk import: stay on the catalog so the user can spot anything
+      // that failed.
+      const fails = (json.results ?? []).filter(
+        (r: { ok: boolean }) => !r.ok,
+      )
+      toast({
+        variant: fails.length === 0 ? "success" : "destructive",
+        title: `Imported ${json.imported} of ${json.total}`,
+        description:
+          fails.length === 0
+            ? "All templates added."
+            : `Failed: ${fails
+                .map(
+                  (f: { form_code: string; error: string }) =>
+                    `${f.form_code ?? "?"} (${f.error})`,
+                )
+                .join("; ")}`,
+      })
+      router.refresh()
+      return
+    }
+
     toast({
       variant: "success",
       title: `Imported ${json.form_code}`,

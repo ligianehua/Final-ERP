@@ -61,13 +61,12 @@ const importPayload = z.object({
 })
 
 // POST /api/forms/templates/import
-// Admin-only. Takes a JSON export (from GET .../export) and recreates
-// the template. If pdf_base64 is present we also re-render PNGs;
-// otherwise we just write the metadata + schema + mapping and the
-// receiving admin uses Replace PDF to supply the binary.
-//
-// Refuses to overwrite an existing form_code — the caller should
-// delete or rename first. (We don't silently merge schemas.)
+// Admin-only. Accepts either a single-template envelope (from GET
+// .../export) or a bulk bundle (`{templates: [...]}` from GET
+// .../bulk-export). Each template gets the full save pipeline —
+// PDF + PNG render + row insert. Refuses to overwrite existing
+// form_codes; reports per-template successes/failures so a partially
+// successful bulk import is recoverable.
 export async function POST(request: Request) {
   const supabase = await createClient()
   const {
@@ -86,12 +85,68 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
   }
-  const parsed = importPayload.safeParse(body)
-  if (!parsed.success) {
+
+  // Detect bundle vs single envelope.
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    Array.isArray((body as { templates?: unknown }).templates)
+  ) {
+    const bundle = body as { templates: unknown[] }
+    const results: Array<{
+      form_code: string | null
+      ok: boolean
+      error?: string
+      pages_uploaded?: number
+    }> = []
+    let okCount = 0
+    for (const item of bundle.templates) {
+      const result = await importOne(item, supabase, user.id)
+      results.push(result)
+      if (result.ok) okCount++
+    }
+    return NextResponse.json({
+      success: okCount > 0,
+      bundle: true,
+      total: bundle.templates.length,
+      imported: okCount,
+      results,
+    })
+  }
+
+  const single = await importOne(body, supabase, user.id)
+  if (!single.ok) {
+    const status = single.error?.includes("already exists") ? 409 : 422
     return NextResponse.json(
-      { error: "Validation failed", details: parsed.error.flatten() },
-      { status: 422 },
+      { error: single.error ?? "Import failed" },
+      { status },
     )
+  }
+  return NextResponse.json({
+    success: true,
+    form_code: single.form_code,
+    pdf_uploaded: (single.pages_uploaded ?? 0) > 0,
+    pages_uploaded: single.pages_uploaded ?? 0,
+  })
+}
+
+async function importOne(
+  raw: unknown,
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+): Promise<{
+  form_code: string | null
+  ok: boolean
+  error?: string
+  pages_uploaded?: number
+}> {
+  const parsed = importPayload.safeParse(raw)
+  if (!parsed.success) {
+    return {
+      form_code: null,
+      ok: false,
+      error: "Validation failed: " + JSON.stringify(parsed.error.flatten()),
+    }
   }
   const data = parsed.data
 
@@ -102,12 +157,11 @@ export async function POST(request: Request) {
     .eq("form_code", data.form_code)
     .maybeSingle()
   if (existing) {
-    return NextResponse.json(
-      {
-        error: `Template "${data.form_code}" already exists. Delete it first or rename the export's form_code.`,
-      },
-      { status: 409 },
-    )
+    return {
+      form_code: data.form_code,
+      ok: false,
+      error: `Template "${data.form_code}" already exists. Delete it first or rename the export's form_code.`,
+    }
   }
 
   let pdfStoragePath: string | null = null
@@ -118,16 +172,18 @@ export async function POST(request: Request) {
     try {
       pdfBytes = Buffer.from(data.pdf_base64, "base64")
     } catch {
-      return NextResponse.json(
-        { error: "pdf_base64 is not valid base64" },
-        { status: 400 },
-      )
+      return {
+        form_code: data.form_code,
+        ok: false,
+        error: "pdf_base64 is not valid base64",
+      }
     }
     if (pdfBytes.length < 100) {
-      return NextResponse.json(
-        { error: "PDF bytes too small to be real" },
-        { status: 400 },
-      )
+      return {
+        form_code: data.form_code,
+        ok: false,
+        error: "PDF bytes too small to be real",
+      }
     }
 
     pdfStoragePath = `${data.form_code}.pdf`
@@ -139,10 +195,11 @@ export async function POST(request: Request) {
           upsert: true,
         })
       if (error) {
-        return NextResponse.json(
-          { error: `PDF upload failed: ${error.message}` },
-          { status: 500 },
-        )
+        return {
+          form_code: data.form_code,
+          ok: false,
+          error: `PDF upload failed: ${error.message}`,
+        }
       }
     }
 
@@ -170,22 +227,23 @@ export async function POST(request: Request) {
             upsert: true,
           })
         if (error) {
-          return NextResponse.json(
-            { error: `PNG upload failed (${name}): ${error.message}` },
-            { status: 500 },
-          )
+          return {
+            form_code: data.form_code,
+            ok: false,
+            error: `PNG upload failed (${name}): ${error.message}`,
+          }
         }
         pagesUploaded++
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "PNG render failed"
-      return NextResponse.json({ error: message }, { status: 500 })
+      return { form_code: data.form_code, ok: false, error: message }
     } finally {
       await rm(workDir, { recursive: true, force: true }).catch(() => {})
     }
   }
 
-  const { error: insertError, data: row } = await supabase
+  const { error: insertError } = await supabase
     .from("form_templates")
     .insert({
       form_code: data.form_code,
@@ -200,20 +258,20 @@ export async function POST(request: Request) {
       dimensions: data.dimensions,
       field_mapping: data.field_mapping,
       field_schema: data.field_schema,
-      created_by: user.id,
+      created_by: userId,
     })
-    .select()
-    .single()
 
   if (insertError) {
-    return NextResponse.json({ error: insertError.message }, { status: 500 })
+    return {
+      form_code: data.form_code,
+      ok: false,
+      error: insertError.message,
+    }
   }
 
-  return NextResponse.json({
-    success: true,
+  return {
     form_code: data.form_code,
-    pdf_uploaded: !!pdfStoragePath,
+    ok: true,
     pages_uploaded: pagesUploaded,
-    row,
-  })
+  }
 }

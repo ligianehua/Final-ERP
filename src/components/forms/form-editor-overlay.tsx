@@ -209,20 +209,73 @@ export function FormEditorOverlay({
     setRedoCount(redoStack.current.length)
   }, [overrides, onReplaceOverrides])
 
-  // Cmd/Ctrl + Z = undo, +Shift = redo. Only active in layout mode so
-  // a user typing values isn't trapped.
+  // Click-select a field's overlay in Layout mode so the keyboard can
+  // nudge it. Cleared on Esc, mode switch, or click on an empty page.
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  // Live drag tracker — drives the alignment-guide overlay.
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+
   useEffect(() => {
-    if (mode !== "layout" || !onReplaceOverrides) return
+    if (mode !== "layout") setSelectedId(null)
+  }, [mode])
+
+  // Keyboard handlers: arrow nudges the selected field, Cmd/Ctrl+Z
+  // undoes, +Shift redoes, Esc clears selection. Suspended while the
+  // user is typing in a value input.
+  useEffect(() => {
+    if (mode !== "layout") return
     function handler(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null
+      const tag = target?.tagName
+      const typing =
+        tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable
       const isMod = e.ctrlKey || e.metaKey
-      if (!isMod || e.key.toLowerCase() !== "z") return
-      e.preventDefault()
-      if (e.shiftKey) redo()
-      else undo()
+      if (isMod && e.key.toLowerCase() === "z") {
+        if (!onReplaceOverrides) return
+        e.preventDefault()
+        if (e.shiftKey) redo()
+        else undo()
+        return
+      }
+      if (e.key === "Escape") {
+        setSelectedId(null)
+        return
+      }
+      if (typing) return
+      if (
+        selectedId &&
+        ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)
+      ) {
+        e.preventDefault()
+        const step = e.shiftKey ? 10 : 1
+        const cur = overrides[selectedId] ?? { dx: 0, dy: 0 }
+        let dx = cur.dx
+        let dy = cur.dy
+        if (e.key === "ArrowLeft") dx -= step
+        if (e.key === "ArrowRight") dx += step
+        if (e.key === "ArrowUp") dy += step
+        if (e.key === "ArrowDown") dy -= step
+        snapshotOverrides()
+        onOverrideChange(selectedId, {
+          dx,
+          dy,
+          dw: cur.dw,
+          dh: cur.dh,
+        })
+      }
     }
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
-  }, [mode, onReplaceOverrides, undo, redo])
+  }, [
+    mode,
+    onReplaceOverrides,
+    undo,
+    redo,
+    selectedId,
+    overrides,
+    onOverrideChange,
+    snapshotOverrides,
+  ])
   const canRightClickAdd = isAdmin && mode === "layout" && !!onAddField
   const [pendingAdd, setPendingAdd] = useState<{
     page: number
@@ -249,6 +302,86 @@ export function FormEditorOverlay({
     }
     return m
   }, [template])
+
+  // Rect of every field in PDF coords (after overrides). Used by the
+  // alignment-guide overlay to compare the dragging field's edges
+  // against its siblings on the same page.
+  const allRects = useMemo(() => {
+    const m: Record<
+      string,
+      { id: string; page: number; left: number; right: number; top: number; bottom: number }
+    > = {}
+    if (template.mapping.strategy !== "coordinates") return m
+    for (const [id, spec] of Object.entries(template.mapping.fields)) {
+      const o = overrides[id]
+      const baseW = spec.width ?? spec.maxWidth ?? 100
+      const baseH = spec.height ?? (spec.size ?? 10) + 2
+      const dx = o?.dx ?? 0
+      const dy = o?.dy ?? 0
+      const dw = o?.dw ?? 0
+      const dh = o?.dh ?? 0
+      const w = Math.max(20, baseW + dw)
+      const h = Math.max(8, baseH + dh)
+      const effX = spec.x + dx
+      const effY = spec.y + dy - dh
+      let leftPdf = effX
+      if (spec.align === "right") leftPdf = effX - w
+      else if (spec.align === "center") leftPdf = effX - w / 2
+      // In display coords (top-down) so guide lines map to CSS easily.
+      const topDisplay = template.dimensions.height - (effY + h - 1)
+      const bottomDisplay = topDisplay + h
+      m[id] = {
+        id,
+        page: spec.page,
+        left: leftPdf,
+        right: leftPdf + w,
+        top: topDisplay,
+        bottom: bottomDisplay,
+      }
+    }
+    return m
+  }, [template, overrides])
+
+  // Guides for whichever page the dragging field lives on. Match
+  // tolerance is small — admins want a confident snap-feel without
+  // ghost lines flickering on every pixel.
+  const TOL = 2
+  const guides = useMemo(() => {
+    if (!draggingId) return [] as Array<{
+      page: number
+      axis: "v" | "h"
+      coord: number
+      anchorId: string
+    }>
+    const drag = allRects[draggingId]
+    if (!drag) return []
+    const out: Array<{
+      page: number
+      axis: "v" | "h"
+      coord: number
+      anchorId: string
+    }> = []
+    for (const r of Object.values(allRects)) {
+      if (r.id === drag.id || r.page !== drag.page) continue
+      // Vertical guides (column alignment)
+      const lefts = [drag.left, drag.right]
+      for (const l of lefts) {
+        if (Math.abs(r.left - l) <= TOL)
+          out.push({ page: r.page, axis: "v", coord: r.left, anchorId: r.id })
+        if (Math.abs(r.right - l) <= TOL)
+          out.push({ page: r.page, axis: "v", coord: r.right, anchorId: r.id })
+      }
+      // Horizontal guides (row alignment)
+      const tops = [drag.top, drag.bottom]
+      for (const t of tops) {
+        if (Math.abs(r.top - t) <= TOL)
+          out.push({ page: r.page, axis: "h", coord: r.top, anchorId: r.id })
+        if (Math.abs(r.bottom - t) <= TOL)
+          out.push({ page: r.page, axis: "h", coord: r.bottom, anchorId: r.id })
+      }
+    }
+    return out
+  }, [draggingId, allRects])
 
   const fieldCountByPage = useMemo(() => {
     const m: Record<number, number> = {}
@@ -354,6 +487,12 @@ export function FormEditorOverlay({
                 pageRefs.current[pageNum - 1] = el
               }}
               data-page={pageNum}
+              onMouseDown={(e) => {
+                // Click on empty page area (no field) clears selection.
+                if (mode === "layout" && e.target === e.currentTarget) {
+                  setSelectedId(null)
+                }
+              }}
               onContextMenu={(e) => {
                 if (!canRightClickAdd) return
                 e.preventDefault()
@@ -380,6 +519,34 @@ export function FormEditorOverlay({
                 className="block select-none pointer-events-none"
               />
 
+              {/* Alignment guides — drawn UNDER the field cells so
+                  they don't intercept clicks. */}
+              {guides
+                .filter((g) => g.page === pageNum)
+                .map((g, i) =>
+                  g.axis === "v" ? (
+                    <div
+                      key={`gv-${i}`}
+                      className="absolute pointer-events-none border-l border-dashed border-fuchsia-500/80"
+                      style={{
+                        left: g.coord * scale,
+                        top: 0,
+                        height: displayHeight,
+                      }}
+                    />
+                  ) : (
+                    <div
+                      key={`gh-${i}`}
+                      className="absolute pointer-events-none border-t border-dashed border-fuchsia-500/80"
+                      style={{
+                        top: g.coord * scale,
+                        left: 0,
+                        width: displayWidth,
+                      }}
+                    />
+                  ),
+                )}
+
               {entries.map(([id, spec]) => (
                 <FieldCell
                   key={id}
@@ -400,6 +567,11 @@ export function FormEditorOverlay({
                   }}
                   onOverrideChange={onOverrideChange}
                   onGestureStart={snapshotOverrides}
+                  selected={selectedId === id}
+                  onSelect={() => setSelectedId(id)}
+                  onDragStateChange={(active) =>
+                    setDraggingId(active ? id : null)
+                  }
                 />
               ))}
 
@@ -779,6 +951,9 @@ function FieldCell({
   onValueChange,
   onOverrideChange,
   onGestureStart,
+  selected,
+  onSelect,
+  onDragStateChange,
 }: {
   id: string
   spec: CoordSpec
@@ -795,6 +970,11 @@ function FieldCell({
   onOverrideChange: Props["onOverrideChange"]
   /** Snapshot for undo before this field's first gesture starts. */
   onGestureStart?: () => void
+  selected?: boolean
+  onSelect?: () => void
+  /** Called when a drag/resize gesture starts/ends so the overlay can
+   *  draw alignment guides for the duration of the gesture. */
+  onDragStateChange?: (active: boolean) => void
 }) {
   const size = spec.size ?? 10
   const baseWidth = spec.width ?? spec.maxWidth ?? 100
@@ -829,8 +1009,10 @@ function FieldCell({
   function startDrag(e: React.MouseEvent) {
     e.preventDefault()
     e.stopPropagation()
+    onSelect?.()
     onGestureStart?.()
     isDragging.current = true
+    onDragStateChange?.(true)
     const startMX = e.clientX
     const startMY = e.clientY
     const initial = {
@@ -854,6 +1036,7 @@ function FieldCell({
 
     function handleUp() {
       isDragging.current = false
+      onDragStateChange?.(false)
       window.removeEventListener("mousemove", handleMove)
       window.removeEventListener("mouseup", handleUp)
     }
@@ -865,7 +1048,9 @@ function FieldCell({
   function startResize(e: React.MouseEvent) {
     e.preventDefault()
     e.stopPropagation()
+    onSelect?.()
     onGestureStart?.()
+    onDragStateChange?.(true)
     const startMX = e.clientX
     const startMY = e.clientY
     const initial = {
@@ -887,6 +1072,7 @@ function FieldCell({
     }
 
     function handleUp() {
+      onDragStateChange?.(false)
       window.removeEventListener("mousemove", handleMove)
       window.removeEventListener("mouseup", handleUp)
     }
@@ -926,11 +1112,13 @@ function FieldCell({
         <div
           onMouseDown={startDrag}
           onDoubleClick={() => onOverrideChange(id, null)}
-          title={`${label} — drag to move, corner to resize, double-click to reset`}
+          title={`${label} — drag to move, corner to resize, arrows to nudge (Shift = 10pt), double-click to reset`}
           className={cn(
             "absolute cursor-move group",
             "border border-blue-500/50 bg-blue-500/10 hover:bg-blue-500/20",
             override && "border-amber-500/70 bg-amber-500/15",
+            selected &&
+              "ring-2 ring-primary ring-offset-1 border-primary/80 bg-primary/15",
           )}
           style={{
             left: `${cssLeft}px`,
