@@ -7,14 +7,15 @@ import {
   getExtension,
   isSupportedExtension,
 } from "@/lib/convert/supported"
-import { fileToImageDataUrl } from "@/lib/ai/file-to-image"
-import { analyzeTemplate } from "@/lib/ai/analyze-template"
+import { fileToImageDataUrls } from "@/lib/ai/file-to-image"
+import { analyzeTemplate, type TemplateAnalysis } from "@/lib/ai/analyze-template"
 
 export const runtime = "nodejs"
-export const maxDuration = 120
+export const maxDuration = 300
 
 const MAX_FILE_SIZE_MB = 25
 const MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024
+const MAX_AI_PAGES = 10
 
 // POST /api/templates/analyze
 // multipart/form-data: { file: <any supported document> }
@@ -91,29 +92,89 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 500 })
   }
 
-  // 3) Render page 1 as a PNG data URL for the vision model.
-  let imageDataUrl: string
+  // 3) Render every page (up to MAX_AI_PAGES) as PNG data URLs.
+  const aiPageCount = Math.min(dimensions.pageCount, MAX_AI_PAGES)
+  let imageDataUrls: string[]
   try {
-    imageDataUrl = await fileToImageDataUrl(pdfBytes, "page.pdf")
+    imageDataUrls = await fileToImageDataUrls(pdfBytes, "page.pdf", {
+      maxPages: aiPageCount,
+    })
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Page rendering failed"
     return NextResponse.json({ error: message }, { status: 500 })
   }
 
-  // 4) Ask the AI to identify issuer, form, and fields.
-  let analysis
-  try {
-    analysis = await analyzeTemplate(imageDataUrl)
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Analysis failed"
-    return NextResponse.json({ error: message }, { status: 500 })
+  // 4) Fan out: ask the AI per page in parallel. Page 1 sets issuer /
+  //    form_name / form_code / confidence / reasoning; all pages
+  //    contribute fields tagged with their page number. Per-page
+  //    failures are non-fatal — we still ship whatever succeeded so
+  //    the admin can review and re-run if needed.
+  type PageResult =
+    | { ok: true; page: number; analysis: TemplateAnalysis }
+    | { ok: false; page: number; error: string }
+
+  const results: PageResult[] = await Promise.all(
+    imageDataUrls.map(async (url, idx) => {
+      const page = idx + 1
+      try {
+        const analysis = await analyzeTemplate(url, {
+          pageNumber: page,
+          pageCount: aiPageCount,
+        })
+        return { ok: true as const, page, analysis }
+      } catch (err) {
+        const error = err instanceof Error ? err.message : "Analysis failed"
+        return { ok: false as const, page, error }
+      }
+    }),
+  )
+
+  const firstOk = results.find(
+    (r): r is Extract<PageResult, { ok: true }> => r.ok,
+  )
+  if (!firstOk) {
+    return NextResponse.json(
+      {
+        error: "All pages failed to analyse",
+        details: results.map((r) =>
+          r.ok ? null : { page: r.page, error: r.error },
+        ),
+      },
+      { status: 500 },
+    )
   }
+
+  type AnalysisField = TemplateAnalysis["fields"][number] & { page: number }
+  const mergedFields: AnalysisField[] = []
+  for (const r of results) {
+    if (!r.ok) continue
+    for (const f of r.analysis.fields) {
+      mergedFields.push({ ...f, page: r.page })
+    }
+  }
+
+  const analysis = {
+    ...firstOk.analysis,
+    fields: mergedFields,
+  }
+
+  const per_page = results.map((r) =>
+    r.ok
+      ? {
+          page: r.page,
+          field_count: r.analysis.fields.length,
+          confidence: r.analysis.confidence,
+          error: null,
+        }
+      : { page: r.page, field_count: 0, confidence: 0, error: r.error },
+  )
 
   // 5) Return everything the client needs to drive the review UI.
   return NextResponse.json({
     analysis,
     dimensions,
+    per_page,
     pdf_base64: Buffer.from(pdfBytes).toString("base64"),
     original_filename: file.name,
   })

@@ -36,7 +36,26 @@ Rules:
 - vat_status: "vat_registered" if marked VAT/VAT-registered; "non_vat" if marked Non-VAT or Percentage Tax; null if unclear.
 - Output ONLY the JSON object. No prose, no markdown fences, no explanation.`
 
-export const TEMPLATE_ANALYSIS_PROMPT_V1 = `You are analyzing a Philippine government / bank / business form. The image is page 1 of a multi-page form template that an administrator wants to add to a catalog so future users can auto-fill it.
+export const TEMPLATE_ANALYSIS_PROMPT_V1 = templateAnalysisPrompt()
+
+/**
+ * Same V1 prompt, but injects "page N of M" framing so multi-page
+ * analyzers can hint context (mostly used for the model's own
+ * de-duplication: page > 1 should usually skip header repeats).
+ */
+export function templateAnalysisPrompt(opts: {
+  pageNumber?: number
+  pageCount?: number
+} = {}): string {
+  const pageLine =
+    opts.pageNumber && opts.pageCount && opts.pageCount > 1
+      ? `The image is page ${opts.pageNumber} of a ${opts.pageCount}-page form template`
+      : "The image is a form template"
+  const skipRepeats =
+    opts.pageNumber && opts.pageNumber > 1
+      ? `\n- Skip header fields that obviously repeat from page 1 (the same TIN box, the same company-name box on every page). Only list fields that look NEW on this page.`
+      : ""
+  return `You are analyzing a Philippine government / bank / business form. ${pageLine} that an administrator wants to add to a catalog so future users can auto-fill it.
 
 Identify three things:
 1) ISSUER  — the organization that issued this form
@@ -87,7 +106,8 @@ Rules:
   ("BIR_2550M"). Otherwise: ISSUER_SHORT_FORMNAME, e.g.
   "BDO_ACCOUNT_OPENING".
 - If the page is clearly NOT a form (a cover page, an instruction sheet,
-  a map), set fields: [] and confidence < 0.5 and explain in reasoning.`
+  a map), set fields: [] and confidence < 0.5 and explain in reasoning.${skipRepeats}`
+}
 
 export const VAT_SUMMARY_EXTRACTION_PROMPT_V1 = `You are an accounting assistant for Philippine SMEs.
 

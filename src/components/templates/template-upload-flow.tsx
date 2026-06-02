@@ -30,6 +30,8 @@ type AnalysisField = {
   required: boolean
   approximate_position: ApproxPos
   notes: string | null
+  /** Which page of the source PDF this field was identified on (1-based). */
+  page: number
 }
 
 type Analysis = {
@@ -47,6 +49,13 @@ type Analysis = {
 
 type Dimensions = { width: number; height: number; pageCount: number }
 
+type PageSummary = {
+  page: number
+  field_count: number
+  confidence: number
+  error: string | null
+}
+
 type Stage =
   | { kind: "idle" }
   | { kind: "analyzing"; fileName: string }
@@ -56,6 +65,7 @@ type Stage =
       analysis: Analysis
       dimensions: Dimensions
       pdfBase64: string
+      perPage: PageSummary[]
     }
   | { kind: "saving" }
   | { kind: "error"; message: string }
@@ -125,6 +135,7 @@ export function TemplateUploadFlow() {
       analysis,
       dimensions: json.dimensions,
       pdfBase64: json.pdf_base64,
+      perPage: (json.per_page ?? []) as PageSummary[],
     })
   }
 
@@ -147,6 +158,7 @@ export function TemplateUploadFlow() {
     const { analysis, dimensions, pdfBase64 } = review
 
     // AI positions are top-down %s; convert to pdf-lib bottom-up baselines.
+    // Per-field `page` carries through from the multi-page analyzer.
     const fields = analysis.fields
       .map((f, i) => ({ f, i }))
       .filter(({ i }) => included[i])
@@ -171,7 +183,7 @@ export function TemplateUploadFlow() {
           semantic_type: f.semantic_type,
           data_source: f.data_source,
           required: f.required,
-          page: 1,
+          page: f.page,
           x,
           y: baselineY,
           width: widthPdf,
@@ -228,8 +240,9 @@ export function TemplateUploadFlow() {
           <Loader2 className="size-6 animate-spin text-muted-foreground" />
           <p className="text-sm font-medium">Analyzing {stage.fileName}</p>
           <p className="text-xs text-muted-foreground max-w-sm">
-            Converting to PDF, rendering page 1, asking the vision model to
-            identify the issuer and fields. This usually takes 15-30 seconds.
+            Converting to PDF, rendering every page, asking the vision
+            model to identify the issuer and fields on each page in
+            parallel. This usually takes 20-60 seconds.
           </p>
         </CardContent>
       </Card>
@@ -274,11 +287,12 @@ export function TemplateUploadFlow() {
   }
 
   // Review stage
-  const { analysis, dimensions } = stage
+  const { analysis, dimensions, perPage } = stage
   const issuerSubtitle =
     analysis.issuer.abbreviation && analysis.issuer.abbreviation !== analysis.issuer.name
       ? `${analysis.issuer.abbreviation} · ${analysis.issuer.name}`
       : analysis.issuer.name
+  const failedPages = perPage.filter((p) => p.error !== null)
 
   return (
     <div className="space-y-4">
@@ -354,13 +368,62 @@ export function TemplateUploadFlow() {
         </CardContent>
       </Card>
 
+      {perPage.length > 1 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">
+              Per-page analysis ({perPage.length} pages)
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              The vision model ran on each page in parallel.
+              {failedPages.length > 0 && (
+                <span className="text-destructive">
+                  {" "}
+                  {failedPages.length} page
+                  {failedPages.length === 1 ? "" : "s"} failed — re-upload
+                  if you need them.
+                </span>
+              )}
+            </p>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ul className="divide-y text-xs">
+              {perPage.map((p) => (
+                <li
+                  key={p.page}
+                  className="px-3 py-2 flex items-center gap-3"
+                >
+                  <span className="font-mono w-12 text-muted-foreground">
+                    P{p.page}
+                  </span>
+                  <span className="flex-1">
+                    {p.error ? (
+                      <span className="text-destructive">{p.error}</span>
+                    ) : (
+                      <>
+                        {p.field_count} field
+                        {p.field_count === 1 ? "" : "s"}
+                      </>
+                    )}
+                  </span>
+                  {p.error === null && (
+                    <ConfidencePill value={p.confidence} />
+                  )}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">
             Fields ({included.filter(Boolean).length} / {analysis.fields.length} included)
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            Uncheck anything the AI flagged that isn&apos;t actually a field.
+            Uncheck anything the AI flagged that isn&apos;t actually a field
+            (multi-page forms often repeat the same header).
             Positions are first-pass — you&apos;ll drag-correct them in the
             WYSIWYG editor right after saving.
           </p>
@@ -371,6 +434,7 @@ export function TemplateUploadFlow() {
               <tr>
                 <th className="w-10 px-3 py-2"></th>
                 <th className="text-left px-3 py-2 font-medium">Label</th>
+                <th className="text-left px-3 py-2 font-medium w-14">Page</th>
                 <th className="text-left px-3 py-2 font-medium">Semantic</th>
                 <th className="text-left px-3 py-2 font-medium">Archive source</th>
                 <th className="text-center px-3 py-2 font-medium">Req</th>
@@ -400,6 +464,9 @@ export function TemplateUploadFlow() {
                         {f.notes}
                       </div>
                     )}
+                  </td>
+                  <td className="px-3 py-2 align-top font-mono text-[11px] text-muted-foreground">
+                    P{f.page}
                   </td>
                   <td className="px-3 py-2 align-top font-mono text-[11px] text-muted-foreground">
                     {f.semantic_type}

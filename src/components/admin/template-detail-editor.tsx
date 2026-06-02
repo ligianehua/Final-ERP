@@ -18,6 +18,7 @@ import {
   type EditorTemplate,
 } from "@/components/forms/form-editor-overlay"
 import { FieldSchemaEditor } from "@/components/admin/field-schema-editor"
+import { ReplacePdfButton } from "@/components/admin/replace-pdf-button"
 import { toast } from "@/components/ui/toaster"
 import type { FieldOverrides, CoordSpec } from "@/lib/forms/template-types"
 
@@ -281,13 +282,19 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
       {/* WYSIWYG layout */}
       {fieldSchema ? (
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Layout</CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Switch to <strong>Edit layout</strong> below to drag fields.
-              When you&apos;re happy, <strong>Save as template default</strong>{" "}
-              writes the new positions to the catalog for everyone.
-            </p>
+          <CardHeader className="pb-3 flex flex-row items-start justify-between gap-3">
+            <div className="space-y-1">
+              <CardTitle className="text-base">Layout</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Switch to <strong>Edit layout</strong> below to drag fields.
+                When you&apos;re happy, <strong>Save as template default</strong>{" "}
+                writes the new positions to the catalog for everyone.
+              </p>
+            </div>
+            <ReplacePdfButton
+              formCode={meta.form_code}
+              currentPageCount={template.dimensions.pageCount}
+            />
           </CardHeader>
           <CardContent>
             <FormEditorOverlay

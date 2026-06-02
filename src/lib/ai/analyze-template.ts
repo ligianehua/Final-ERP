@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { getAIClient, getDefaultModel } from "./client"
-import { TEMPLATE_ANALYSIS_PROMPT_V1 } from "./prompts"
+import { templateAnalysisPrompt } from "./prompts"
 
 const semanticTypeSchema = z.enum([
   "company_name",
@@ -54,9 +54,11 @@ export type TemplateAnalysis = z.infer<typeof templateAnalysisSchema>
 
 export async function analyzeTemplate(
   imageDataUrl: string,
+  pageContext?: { pageNumber: number; pageCount: number },
 ): Promise<TemplateAnalysis> {
   const client = getAIClient()
   const model = getDefaultModel()
+  const prompt = templateAnalysisPrompt(pageContext ?? {})
   const response = await client.chat.completions.create({
     model,
     temperature: 0,
@@ -65,14 +67,17 @@ export async function analyzeTemplate(
       {
         role: "user",
         content: [
-          { type: "text", text: TEMPLATE_ANALYSIS_PROMPT_V1 },
+          { type: "text", text: prompt },
           { type: "image_url", image_url: { url: imageDataUrl } },
         ],
       },
     ],
   })
   const raw = response.choices[0]?.message?.content ?? ""
-  console.log("[AI analyze-template] raw:\n" + raw)
+  const tag = pageContext
+    ? `[AI analyze-template p${pageContext.pageNumber}/${pageContext.pageCount}]`
+    : "[AI analyze-template]"
+  console.log(`${tag} raw:\n${raw}`)
   return templateAnalysisSchema.parse(extractJSON(raw))
 }
 
