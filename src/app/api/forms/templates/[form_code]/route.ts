@@ -7,6 +7,7 @@ import {
   serializeTemplate,
 } from "@/lib/forms/templates/effective"
 import { getTemplateConfig } from "@/lib/forms/templates"
+import { STALE_LOCK_MS } from "./lock/route"
 
 type Params = { params: Promise<{ form_code: string }> }
 
@@ -124,12 +125,39 @@ export async function PATCH(request: Request, { params }: Params) {
   const { data: existing } = await supabase
     .from("form_templates")
     .select(
-      "form_code, form_name, agency, dimensions, field_mapping",
+      "form_code, form_name, agency, dimensions, field_mapping, editing_by, editing_by_email, editing_at",
     )
     .eq("form_code", form_code)
     .maybeSingle()
   if (!existing && !getTemplateConfig(form_code)) {
     return NextResponse.json({ error: "Unknown form_code" }, { status: 404 })
+  }
+
+  // Refuse schema / mapping mutations when somebody else holds a
+  // fresh editing lock. Metadata-only edits (form_name, agency,
+  // frequency, etc) pass through — those are infrequent admin tasks
+  // and don't conflict with what the lock holder is doing in the
+  // WYSIWYG editor.
+  const isLayoutOrSchemaEdit =
+    parsed.data.field_mapping !== undefined ||
+    parsed.data.field_schema !== undefined
+  if (isLayoutOrSchemaEdit && existing?.editing_by && existing.editing_by !== user.id) {
+    const heldAt = existing.editing_at
+      ? Date.parse(existing.editing_at)
+      : 0
+    const isFresh = heldAt > 0 && Date.now() - heldAt < STALE_LOCK_MS
+    if (isFresh) {
+      return NextResponse.json(
+        {
+          error: "Locked",
+          holder: {
+            email: existing.editing_by_email,
+            since: existing.editing_at,
+          },
+        },
+        { status: 423 },
+      )
+    }
   }
 
   // If field_schema is being edited, reconcile field_mapping so every

@@ -93,6 +93,8 @@ type Props = {
   formName: string
   agency: string
   initialFields: SchemaField[]
+  /** Render in view-only mode (someone else holds the lock). */
+  readOnly?: boolean
 }
 
 export function FieldSchemaEditor({
@@ -100,6 +102,7 @@ export function FieldSchemaEditor({
   formName,
   agency,
   initialFields,
+  readOnly = false,
 }: Props) {
   const router = useRouter()
   const [fields, setFields] = useState<EditableField[]>(() =>
@@ -437,6 +440,7 @@ export function FieldSchemaEditor({
           variant="outline"
           size="sm"
           onClick={addField}
+          disabled={readOnly}
           className="gap-2"
         >
           <Plus className="size-4" />
@@ -449,9 +453,14 @@ export function FieldSchemaEditor({
               Unsaved changes
             </span>
           )}
+          {readOnly && (
+            <span className="text-xs text-amber-700 dark:text-amber-300">
+              Locked by another admin
+            </span>
+          )}
           <Button
             onClick={save}
-            disabled={!dirty || saving}
+            disabled={!dirty || saving || readOnly}
             size="sm"
             className="gap-2"
           >

@@ -7,8 +7,11 @@ import {
   CheckCircle2,
   ExternalLink,
   Loader2,
+  Lock,
   Save,
+  Unlock,
 } from "lucide-react"
+import { useTemplateLock } from "@/hooks/use-template-lock"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -75,6 +78,8 @@ type Props = {
 
 export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
   const router = useRouter()
+  const lock = useTemplateLock(meta.form_code)
+  const isViewer = lock.mode === "viewer"
 
   // Metadata edit state
   const [formName, setFormName] = useState(meta.form_name)
@@ -252,6 +257,8 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
 
   return (
     <div className="space-y-6">
+      <LockBanner state={lock} />
+
       {/* Metadata */}
       <Card>
         <CardHeader className="pb-3">
@@ -402,7 +409,7 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
             </div>
             <div className="flex gap-2 shrink-0 flex-wrap justify-end">
               <TemplateExportButton formCode={meta.form_code} />
-              {template.mapping.strategy === "coordinates" && (
+              {template.mapping.strategy === "coordinates" && !isViewer && (
                 <ReanalyzeAIButton
                   formCode={meta.form_code}
                   formName={meta.form_name}
@@ -412,10 +419,12 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
                   existingMapping={template.mapping.fields}
                 />
               )}
-              <ReplacePdfButton
-                formCode={meta.form_code}
-                currentPageCount={template.dimensions.pageCount}
-              />
+              {!isViewer && (
+                <ReplacePdfButton
+                  formCode={meta.form_code}
+                  currentPageCount={template.dimensions.pageCount}
+                />
+              )}
             </div>
           </CardHeader>
           <CardContent>
@@ -440,8 +449,8 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
               onOverrideChange={setOverride}
               onReplaceOverrides={setOverrides}
               isAdmin
-              onSaveAsTemplate={saveLayout}
-              onAddField={addFieldAtPosition}
+              onSaveAsTemplate={isViewer ? undefined : saveLayout}
+              onAddField={isViewer ? undefined : addFieldAtPosition}
             />
           </CardContent>
         </Card>
@@ -480,10 +489,66 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
               formName={meta.form_name}
               agency={meta.agency}
               initialFields={fieldSchema.fields}
+              readOnly={isViewer}
             />
           </CardContent>
         </Card>
       )}
     </div>
   )
+}
+
+function LockBanner({
+  state,
+}: {
+  state: ReturnType<typeof useTemplateLock>
+}) {
+  if (state.mode === "loading") return null
+  if (state.mode === "error") {
+    return (
+      <div className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-2 text-sm text-destructive inline-flex items-center gap-2">
+        <AlertCircle className="size-4" />
+        Lock check failed: {state.error}. Edits may collide with another
+        admin — refresh to retry.
+      </div>
+    )
+  }
+  if (state.mode === "viewer") {
+    return (
+      <div className="rounded-md border border-amber-500/40 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm flex items-center justify-between gap-3">
+        <div className="flex items-start gap-2">
+          <Lock className="size-4 text-amber-700 dark:text-amber-300 mt-0.5 shrink-0" />
+          <div className="text-amber-900 dark:text-amber-100">
+            <span className="font-medium">
+              {state.holder.email ?? "Another admin"}
+            </span>{" "}
+            is editing this template (locked{" "}
+            <time className="tabular-nums">
+              {new Date(state.holder.since).toLocaleTimeString()}
+            </time>
+            ). Your saves will be refused until they release. The page
+            will unlock automatically when they leave.
+          </div>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={state.takeover}
+          className="shrink-0 gap-2 border-amber-600/40"
+        >
+          <Unlock className="size-3.5" />
+          Take over
+        </Button>
+      </div>
+    )
+  }
+  if (state.tookOver) {
+    return (
+      <div className="rounded-md border border-green-600/30 bg-green-50 dark:bg-green-950/30 px-4 py-2 text-xs text-green-900 dark:text-green-100 inline-flex items-center gap-2">
+        <CheckCircle2 className="size-3.5" />
+        Lock taken over. You are now the editor.
+      </div>
+    )
+  }
+  return null
 }
