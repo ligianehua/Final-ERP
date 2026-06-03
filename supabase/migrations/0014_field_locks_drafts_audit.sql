@@ -42,7 +42,7 @@ create table if not exists public.form_drafts (
   user_id      uuid not null references auth.users(id) on delete cascade,
   form_code    text not null,
   company_id   uuid references public.companies(id) on delete cascade,
-  signatory_id uuid references public.signatories(id) on delete set null,
+  signatory_id uuid references public.company_people(id) on delete set null,
   values       jsonb not null default '{}'::jsonb,
   overrides    jsonb not null default '{}'::jsonb,
   period       text,
