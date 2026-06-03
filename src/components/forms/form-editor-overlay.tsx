@@ -2,14 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
+  LayoutGrid,
+  List,
   Loader2,
+  Magnet,
   Move,
   Plus,
   Redo2,
   RotateCcw,
   Save,
+  Search,
   Type,
   Undo2,
+  X,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -209,19 +214,53 @@ export function FormEditorOverlay({
     setRedoCount(redoStack.current.length)
   }, [overrides, onReplaceOverrides])
 
-  // Click-select a field's overlay in Layout mode so the keyboard can
-  // nudge it. Cleared on Esc, mode switch, or click on an empty page.
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  // Click-select fields in Layout mode so the keyboard can nudge them.
+  // Shift/Cmd/Ctrl-click extends the set so arrow keys move whole
+  // groups at once. Cleared on Esc, mode switch, or empty-page click.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   // Live drag tracker — drives the alignment-guide overlay.
   const [draggingId, setDraggingId] = useState<string | null>(null)
+  // Layout-mode UX state — snap-to-grid, search-highlight, and the
+  // view toggle for the table-instead-of-PDF mode.
+  const [snapToGrid, setSnapToGrid] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [viewMode, setViewMode] = useState<"pdf" | "table">("pdf")
+  const GRID_SIZE = 5
+
+  function selectField(id: string, additive: boolean) {
+    setSelectedIds((prev) => {
+      if (!additive) return new Set([id])
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   useEffect(() => {
-    if (mode !== "layout") setSelectedId(null)
+    if (mode !== "layout") setSelectedIds(new Set())
   }, [mode])
 
-  // Keyboard handlers: arrow nudges the selected field, Cmd/Ctrl+Z
-  // undoes, +Shift redoes, Esc clears selection. Suspended while the
-  // user is typing in a value input.
+  // Match-set for the search highlight. Null = search box is empty
+  // (no dimming at all); otherwise = the ids that matched.
+  const matchSet = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (q === "") return null
+    const m = new Set<string>()
+    for (const f of fields) {
+      if (
+        f.label.toLowerCase().includes(q) ||
+        f.id.toLowerCase().includes(q)
+      ) {
+        m.add(f.id)
+      }
+    }
+    return m
+  }, [searchQuery, fields])
+
+  // Keyboard handlers: arrow nudges the selection, Cmd/Ctrl+Z undoes,
+  // +Shift redoes, Esc clears selection. Suspended while the user is
+  // typing in a value input (or in the search box).
   useEffect(() => {
     if (mode !== "layout") return
     function handler(e: KeyboardEvent) {
@@ -238,30 +277,45 @@ export function FormEditorOverlay({
         return
       }
       if (e.key === "Escape") {
-        setSelectedId(null)
+        setSelectedIds(new Set())
         return
       }
       if (typing) return
       if (
-        selectedId &&
+        selectedIds.size > 0 &&
         ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)
       ) {
         e.preventDefault()
         const step = e.shiftKey ? 10 : 1
-        const cur = overrides[selectedId] ?? { dx: 0, dy: 0 }
-        let dx = cur.dx
-        let dy = cur.dy
-        if (e.key === "ArrowLeft") dx -= step
-        if (e.key === "ArrowRight") dx += step
-        if (e.key === "ArrowUp") dy += step
-        if (e.key === "ArrowDown") dy -= step
         snapshotOverrides()
-        onOverrideChange(selectedId, {
-          dx,
-          dy,
-          dw: cur.dw,
-          dh: cur.dh,
-        })
+        // Apply the same delta to every selected field. We use the
+        // bulk-replace path when the parent supports it so the entire
+        // multi-field move counts as one undo step.
+        if (onReplaceOverrides) {
+          const next = { ...overrides }
+          for (const id of selectedIds) {
+            const cur = next[id] ?? { dx: 0, dy: 0 }
+            let dx = cur.dx
+            let dy = cur.dy
+            if (e.key === "ArrowLeft") dx -= step
+            if (e.key === "ArrowRight") dx += step
+            if (e.key === "ArrowUp") dy += step
+            if (e.key === "ArrowDown") dy -= step
+            next[id] = { ...cur, dx, dy }
+          }
+          onReplaceOverrides(next)
+        } else {
+          for (const id of selectedIds) {
+            const cur = overrides[id] ?? { dx: 0, dy: 0 }
+            let dx = cur.dx
+            let dy = cur.dy
+            if (e.key === "ArrowLeft") dx -= step
+            if (e.key === "ArrowRight") dx += step
+            if (e.key === "ArrowUp") dy += step
+            if (e.key === "ArrowDown") dy -= step
+            onOverrideChange(id, { dx, dy, dw: cur.dw, dh: cur.dh })
+          }
+        }
       }
     }
     window.addEventListener("keydown", handler)
@@ -271,7 +325,7 @@ export function FormEditorOverlay({
     onReplaceOverrides,
     undo,
     redo,
-    selectedId,
+    selectedIds,
     overrides,
     onOverrideChange,
     snapshotOverrides,
@@ -465,18 +519,57 @@ export function FormEditorOverlay({
         showUndo={!!onReplaceOverrides && mode === "layout"}
       />
 
-      {pageCount > 1 && (
-        <PageThumbnailStrip
-          formCode={formCode}
-          pageCount={pageCount}
-          pageImagePrefix={template.page_image_prefix}
-          fieldCountByPage={fieldCountByPage}
-          activePage={activePage}
-          onJump={jumpToPage}
+      {mode === "layout" && (
+        <LayoutSubBar
+          snapToGrid={snapToGrid}
+          onSnapToGridChange={setSnapToGrid}
+          gridSize={GRID_SIZE}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          matchCount={matchSet?.size}
+          totalFields={fields.length}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          selectedCount={selectedIds.size}
+          onClearSelection={() => setSelectedIds(new Set())}
         />
       )}
 
-      <div className="space-y-6">
+      {mode === "layout" && viewMode === "table" ? (
+        <FieldTable
+          fields={fields}
+          mapping={
+            template.mapping.strategy === "coordinates"
+              ? template.mapping.fields
+              : {}
+          }
+          overrides={overrides}
+          selectedIds={selectedIds}
+          matchSet={matchSet}
+          onSelect={selectField}
+          onOverrideChange={onOverrideChange}
+          onGestureStart={snapshotOverrides}
+          onJumpToPDF={(id, page) => {
+            setViewMode("pdf")
+            setSelectedIds(new Set([id]))
+            // Defer the scroll so the page divs have a chance to mount.
+            setTimeout(() => jumpToPage(page), 50)
+          }}
+        />
+      ) : (
+        <>
+          {pageCount > 1 && (
+            <PageThumbnailStrip
+              formCode={formCode}
+              pageCount={pageCount}
+              pageImagePrefix={template.page_image_prefix}
+              fieldCountByPage={fieldCountByPage}
+              activePage={activePage}
+              onJump={jumpToPage}
+            />
+          )}
+
+          <div className="space-y-6">
         {Array.from({ length: pageCount }, (_, i) => i + 1).map((pageNum) => {
           const entries = byPage[pageNum] ?? []
 
@@ -490,7 +583,7 @@ export function FormEditorOverlay({
               onMouseDown={(e) => {
                 // Click on empty page area (no field) clears selection.
                 if (mode === "layout" && e.target === e.currentTarget) {
-                  setSelectedId(null)
+                  setSelectedIds(new Set())
                 }
               }}
               onContextMenu={(e) => {
@@ -567,11 +660,15 @@ export function FormEditorOverlay({
                   }}
                   onOverrideChange={onOverrideChange}
                   onGestureStart={snapshotOverrides}
-                  selected={selectedId === id}
-                  onSelect={() => setSelectedId(id)}
+                  selected={selectedIds.has(id)}
+                  onSelect={(additive) => selectField(id, additive)}
                   onDragStateChange={(active) =>
                     setDraggingId(active ? id : null)
                   }
+                  dimmed={matchSet !== null && !matchSet.has(id)}
+                  highlighted={matchSet !== null && matchSet.has(id)}
+                  snapToGrid={snapToGrid}
+                  gridSize={GRID_SIZE}
                 />
               ))}
 
@@ -598,7 +695,9 @@ export function FormEditorOverlay({
             </div>
           )
         })}
-      </div>
+          </div>
+        </>
+      )}
 
       <Dialog
         open={pendingAdd !== null && !adding}
@@ -954,6 +1053,10 @@ function FieldCell({
   selected,
   onSelect,
   onDragStateChange,
+  dimmed,
+  highlighted,
+  snapToGrid,
+  gridSize,
 }: {
   id: string
   spec: CoordSpec
@@ -971,11 +1074,19 @@ function FieldCell({
   /** Snapshot for undo before this field's first gesture starts. */
   onGestureStart?: () => void
   selected?: boolean
-  onSelect?: () => void
+  /** `additive` = caller held Shift/Cmd/Ctrl while clicking. */
+  onSelect?: (additive: boolean) => void
   /** Called when a drag/resize gesture starts/ends so the overlay can
    *  draw alignment guides for the duration of the gesture. */
   onDragStateChange?: (active: boolean) => void
+  /** Search-highlight muting. */
+  dimmed?: boolean
+  highlighted?: boolean
+  /** Round drag deltas so the final absolute x/y lands on the grid. */
+  snapToGrid?: boolean
+  gridSize?: number
 }) {
+  const grid = gridSize ?? 5
   const size = spec.size ?? 10
   const baseWidth = spec.width ?? spec.maxWidth ?? 100
   const baseHeight = spec.height ?? size + 2
@@ -1006,10 +1117,15 @@ function FieldCell({
 
   const isDragging = useRef(false)
 
+  function snapAbsolute(absolute: number): number {
+    if (!snapToGrid) return absolute
+    return Math.round(absolute / grid) * grid
+  }
+
   function startDrag(e: React.MouseEvent) {
     e.preventDefault()
     e.stopPropagation()
-    onSelect?.()
+    onSelect?.(e.shiftKey || e.metaKey || e.ctrlKey)
     onGestureStart?.()
     isDragging.current = true
     onDragStateChange?.(true)
@@ -1025,10 +1141,12 @@ function FieldCell({
     function handleMove(ev: MouseEvent) {
       const dPx = ev.clientX - startMX
       const dPy = ev.clientY - startMY
+      const rawX = spec.x + initial.dx + dPx / scale
+      // CSS top grows down; PDF y grows up. Flip.
+      const rawY = spec.y + initial.dy - dPy / scale
       onOverrideChange(id, {
-        dx: initial.dx + dPx / scale,
-        // CSS top grows down; PDF y grows up. Flip.
-        dy: initial.dy - dPy / scale,
+        dx: snapAbsolute(rawX) - spec.x,
+        dy: snapAbsolute(rawY) - spec.y,
         dw: initial.dw,
         dh: initial.dh,
       })
@@ -1048,7 +1166,7 @@ function FieldCell({
   function startResize(e: React.MouseEvent) {
     e.preventDefault()
     e.stopPropagation()
-    onSelect?.()
+    onSelect?.(e.shiftKey || e.metaKey || e.ctrlKey)
     onGestureStart?.()
     onDragStateChange?.(true)
     const startMX = e.clientX
@@ -1063,11 +1181,13 @@ function FieldCell({
     function handleMove(ev: MouseEvent) {
       const dPx = ev.clientX - startMX
       const dPy = ev.clientY - startMY
+      const rawW = baseWidth + initial.dw + dPx / scale
+      const rawH = baseHeight + initial.dh + dPy / scale
       onOverrideChange(id, {
         dx: initial.dx,
         dy: initial.dy,
-        dw: initial.dw + dPx / scale,
-        dh: initial.dh + dPy / scale,
+        dw: snapAbsolute(rawW) - baseWidth,
+        dh: snapAbsolute(rawH) - baseHeight,
       })
     }
 
@@ -1114,11 +1234,14 @@ function FieldCell({
           onDoubleClick={() => onOverrideChange(id, null)}
           title={`${label} — drag to move, corner to resize, arrows to nudge (Shift = 10pt), double-click to reset`}
           className={cn(
-            "absolute cursor-move group",
+            "absolute cursor-move group transition-opacity",
             "border border-blue-500/50 bg-blue-500/10 hover:bg-blue-500/20",
             override && "border-amber-500/70 bg-amber-500/15",
             selected &&
               "ring-2 ring-primary ring-offset-1 border-primary/80 bg-primary/15",
+            highlighted &&
+              "ring-2 ring-yellow-400/90 border-yellow-500/80 bg-yellow-300/25",
+            dimmed && "opacity-25 hover:opacity-60",
           )}
           style={{
             left: `${cssLeft}px`,
@@ -1167,5 +1290,348 @@ function FieldCell({
         </div>
       )}
     </>
+  )
+}
+
+function LayoutSubBar({
+  snapToGrid,
+  onSnapToGridChange,
+  gridSize,
+  searchQuery,
+  onSearchChange,
+  matchCount,
+  totalFields,
+  viewMode,
+  onViewModeChange,
+  selectedCount,
+  onClearSelection,
+}: {
+  snapToGrid: boolean
+  onSnapToGridChange: (next: boolean) => void
+  gridSize: number
+  searchQuery: string
+  onSearchChange: (next: string) => void
+  matchCount?: number
+  totalFields: number
+  viewMode: "pdf" | "table"
+  onViewModeChange: (m: "pdf" | "table") => void
+  selectedCount: number
+  onClearSelection: () => void
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-md border bg-background px-2 py-1.5 text-xs">
+      <button
+        type="button"
+        onClick={() => onSnapToGridChange(!snapToGrid)}
+        title={`Snap to ${gridSize}pt grid (${snapToGrid ? "on" : "off"})`}
+        className={cn(
+          "inline-flex items-center gap-1 px-2 py-1 rounded border transition-colors",
+          snapToGrid
+            ? "bg-foreground text-background border-foreground"
+            : "border-transparent text-muted-foreground hover:bg-muted",
+        )}
+      >
+        <Magnet className="size-3.5" />
+        Snap {gridSize}pt
+      </button>
+
+      <div className="relative flex-1 min-w-[150px] max-w-[280px]">
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder="Find a field…"
+          className="h-7 w-full rounded border border-input bg-background pl-7 pr-12 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => onSearchChange("")}
+            title="Clear search"
+            className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-muted"
+          >
+            <X className="size-3 text-muted-foreground" />
+          </button>
+        )}
+        {matchCount !== undefined && (
+          <span className="absolute right-6 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground tabular-nums">
+            {matchCount}/{totalFields}
+          </span>
+        )}
+      </div>
+
+      {selectedCount > 0 && (
+        <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+          <span className="font-medium text-foreground">{selectedCount}</span>{" "}
+          selected
+          <button
+            type="button"
+            onClick={onClearSelection}
+            className="p-0.5 rounded hover:bg-muted"
+            title="Clear selection (Esc)"
+          >
+            <X className="size-3" />
+          </button>
+        </span>
+      )}
+
+      <div className="ml-auto inline-flex rounded-md border bg-background overflow-hidden">
+        <button
+          type="button"
+          onClick={() => onViewModeChange("pdf")}
+          className={cn(
+            "inline-flex items-center gap-1 px-2 py-1 transition-colors",
+            viewMode === "pdf"
+              ? "bg-foreground text-background"
+              : "text-muted-foreground hover:bg-muted",
+          )}
+          title="PDF view"
+        >
+          <LayoutGrid className="size-3.5" /> PDF
+        </button>
+        <button
+          type="button"
+          onClick={() => onViewModeChange("table")}
+          className={cn(
+            "inline-flex items-center gap-1 px-2 py-1 transition-colors",
+            viewMode === "table"
+              ? "bg-foreground text-background"
+              : "text-muted-foreground hover:bg-muted",
+          )}
+          title="Table view"
+        >
+          <List className="size-3.5" /> Table
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function FieldTable({
+  fields,
+  mapping,
+  overrides,
+  selectedIds,
+  matchSet,
+  onSelect,
+  onOverrideChange,
+  onGestureStart,
+  onJumpToPDF,
+}: {
+  fields: Field[]
+  mapping: Record<string, CoordSpec>
+  overrides: FieldOverrides
+  selectedIds: Set<string>
+  matchSet: Set<string> | null
+  onSelect: (id: string, additive: boolean) => void
+  onOverrideChange: Props["onOverrideChange"]
+  onGestureStart?: () => void
+  onJumpToPDF: (id: string, page: number) => void
+}) {
+  // Header drives sort/select-all. Rows = whatever order the mapping
+  // delivers them — admins can search/filter via the SubBar.
+  const ordered = useMemo(() => {
+    const present = fields.filter((f) => mapping[f.id])
+    return present.sort((a, b) => {
+      const pa = mapping[a.id]?.page ?? 1
+      const pb = mapping[b.id]?.page ?? 1
+      if (pa !== pb) return pa - pb
+      return a.label.localeCompare(b.label)
+    })
+  }, [fields, mapping])
+
+  const visible = useMemo(() => {
+    if (!matchSet) return ordered
+    return ordered.filter((f) => matchSet.has(f.id))
+  }, [ordered, matchSet])
+
+  return (
+    <div className="border rounded-md overflow-hidden">
+      <table className="w-full text-xs">
+        <thead className="bg-muted/40 text-muted-foreground sticky top-0">
+          <tr>
+            <th className="w-8 px-2 py-2"></th>
+            <th className="text-left px-3 py-2 font-medium">Label</th>
+            <th className="text-left px-3 py-2 font-medium w-14">Page</th>
+            <th className="text-right px-2 py-2 font-medium w-20">X</th>
+            <th className="text-right px-2 py-2 font-medium w-20">Y</th>
+            <th className="text-right px-2 py-2 font-medium w-20">W</th>
+            <th className="text-right px-2 py-2 font-medium w-20">H</th>
+            <th className="w-12 px-2 py-2"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {visible.map((f) => {
+            const spec = mapping[f.id]
+            const o = overrides[f.id]
+            const baseW = spec.width ?? spec.maxWidth ?? 100
+            const baseH = spec.height ?? (spec.size ?? 10) + 2
+            const x = spec.x + (o?.dx ?? 0)
+            const y = spec.y + (o?.dy ?? 0) - (o?.dh ?? 0)
+            const w = Math.max(20, baseW + (o?.dw ?? 0))
+            const h = Math.max(8, baseH + (o?.dh ?? 0))
+            const isSelected = selectedIds.has(f.id)
+            return (
+              <tr
+                key={f.id}
+                className={cn(
+                  "border-t hover:bg-muted/30",
+                  isSelected && "bg-primary/5",
+                )}
+              >
+                <td className="px-2 py-2 align-top text-center">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={(e) =>
+                      onSelect(
+                        f.id,
+                        e.nativeEvent instanceof MouseEvent
+                          ? e.nativeEvent.shiftKey
+                          : true,
+                      )
+                    }
+                    className="size-3.5 mt-1"
+                  />
+                </td>
+                <td className="px-3 py-2 align-top">
+                  <button
+                    type="button"
+                    onClick={(e) =>
+                      onSelect(
+                        f.id,
+                        e.shiftKey || e.metaKey || e.ctrlKey,
+                      )
+                    }
+                    className="text-left hover:underline"
+                  >
+                    {f.label}
+                  </button>
+                  <div className="text-[10px] font-mono text-muted-foreground">
+                    {f.id}
+                  </div>
+                </td>
+                <td className="px-3 py-2 align-top font-mono text-[11px] text-muted-foreground">
+                  P{spec.page}
+                </td>
+                <NumberCell
+                  value={x}
+                  onCommit={(v) => {
+                    onGestureStart?.()
+                    onOverrideChange(f.id, {
+                      dx: v - spec.x,
+                      dy: o?.dy ?? 0,
+                      dw: o?.dw,
+                      dh: o?.dh,
+                    })
+                  }}
+                />
+                <NumberCell
+                  value={y}
+                  onCommit={(v) => {
+                    onGestureStart?.()
+                    onOverrideChange(f.id, {
+                      dx: o?.dx ?? 0,
+                      dy: v + (o?.dh ?? 0) - spec.y,
+                      dw: o?.dw,
+                      dh: o?.dh,
+                    })
+                  }}
+                />
+                <NumberCell
+                  value={w}
+                  onCommit={(v) => {
+                    onGestureStart?.()
+                    onOverrideChange(f.id, {
+                      dx: o?.dx ?? 0,
+                      dy: o?.dy ?? 0,
+                      dw: v - baseW,
+                      dh: o?.dh ?? 0,
+                    })
+                  }}
+                />
+                <NumberCell
+                  value={h}
+                  onCommit={(v) => {
+                    onGestureStart?.()
+                    onOverrideChange(f.id, {
+                      dx: o?.dx ?? 0,
+                      dy: o?.dy ?? 0,
+                      dw: o?.dw ?? 0,
+                      dh: v - baseH,
+                    })
+                  }}
+                />
+                <td className="px-2 py-2 align-top text-right">
+                  <button
+                    type="button"
+                    onClick={() => onJumpToPDF(f.id, spec.page)}
+                    className="text-[10px] text-muted-foreground hover:text-foreground"
+                    title="Switch to PDF view and scroll to this field"
+                  >
+                    Locate
+                  </button>
+                </td>
+              </tr>
+            )
+          })}
+          {visible.length === 0 && (
+            <tr>
+              <td
+                colSpan={8}
+                className="px-3 py-6 text-center text-muted-foreground"
+              >
+                {matchSet
+                  ? "No fields match the search."
+                  : "No coord-mapped fields on this template."}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function NumberCell({
+  value,
+  onCommit,
+}: {
+  value: number
+  onCommit: (next: number) => void
+}) {
+  const [draft, setDraft] = useState(value.toFixed(1))
+
+  // Keep the input in sync if the underlying value moves (e.g. drag in
+  // a different view, or undo).
+  useEffect(() => {
+    setDraft(value.toFixed(1))
+  }, [value])
+
+  function commit() {
+    const parsed = Number(draft)
+    if (!Number.isFinite(parsed)) {
+      setDraft(value.toFixed(1))
+      return
+    }
+    if (Math.abs(parsed - value) > 0.05) onCommit(parsed)
+    else setDraft(value.toFixed(1))
+  }
+
+  return (
+    <td className="px-1 py-1 align-top">
+      <input
+        type="number"
+        step={0.5}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur()
+        }}
+        className="w-full h-7 px-1 text-right font-mono text-[11px] rounded border border-input bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+      />
+    </td>
   )
 }
