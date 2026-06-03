@@ -40,7 +40,7 @@ export type RenderInput = {
  * Supabase Storage (admin-uploaded templates under the `templates`
  * bucket). The TemplateConfig's `storage_bucket` is the selector.
  */
-async function loadTemplateBytes(
+export async function loadTemplateBytes(
   template: TemplateConfig,
 ): Promise<Uint8Array> {
   if (!template.storage_bucket) {

@@ -1,17 +1,15 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   AlertCircle,
-  CheckCircle2,
   ExternalLink,
   Loader2,
-  Lock,
   Save,
-  Unlock,
+  Users,
 } from "lucide-react"
-import { useTemplateLock } from "@/hooks/use-template-lock"
+import { useTemplatePresence } from "@/hooks/use-template-lock"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -22,6 +20,7 @@ import {
   type NewFieldRequest,
 } from "@/components/forms/form-editor-overlay"
 import { FieldSchemaEditor } from "@/components/admin/field-schema-editor"
+import { AcroFormMappingEditor } from "@/components/admin/acroform-mapping-editor"
 import { ReplacePdfButton } from "@/components/admin/replace-pdf-button"
 import { ReanalyzeAIButton } from "@/components/admin/reanalyze-ai-button"
 import { TemplateExportButton } from "@/components/admin/template-export-button"
@@ -78,8 +77,22 @@ type Props = {
 
 export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
   const router = useRouter()
-  const lock = useTemplateLock(meta.form_code)
-  const isViewer = lock.mode === "viewer"
+
+  // Layout overrides — relative deltas in PDF points. Persisted to the
+  // template's field_mapping by "Save layout".
+  const [overrides, setOverrides] = useState<FieldOverrides>({})
+  // Fields the layout overlay reports as actively being dragged. Used
+  // by the presence heartbeat to keep their field locks fresh.
+  const [activeLayoutFields, setActiveLayoutFields] = useState<string[]>([])
+  // Fields the schema editor reports as actively being inline-edited.
+  const [activeSchemaFields, setActiveSchemaFields] = useState<string[]>([])
+
+  const heldFields = useMemo(
+    () => Array.from(new Set([...activeLayoutFields, ...activeSchemaFields])),
+    [activeLayoutFields, activeSchemaFields],
+  )
+
+  const presence = useTemplatePresence(meta.form_code, heldFields)
 
   // Metadata edit state
   const [formName, setFormName] = useState(meta.form_name)
@@ -90,10 +103,6 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
   const [sourceUrl, setSourceUrl] = useState(meta.source_url ?? "")
   const [savingMeta, setSavingMeta] = useState(false)
 
-  // Layout overrides — relative deltas in PDF points. Persisted to the
-  // template's field_mapping by "Save layout".
-  const [overrides, setOverrides] = useState<FieldOverrides>({})
-
   function setOverride(id: string, next: { dx: number; dy: number } | null) {
     setOverrides((s) => {
       if (!next) {
@@ -102,6 +111,10 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
       }
       return { ...s, [id]: next }
     })
+    // Dragging this field locks it for the rest of the session.
+    if (next && !activeLayoutFields.includes(id)) {
+      setActiveLayoutFields((s) => [...s, id])
+    }
   }
 
   async function saveMeta() {
@@ -145,18 +158,13 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
       return { ok: false, message: "Not a coordinate template" }
     }
 
-    // Pick an id that doesn't collide with anything already in the
-    // schema (the coord-map keys mirror the schema ids).
     const existingIds = new Set(fieldSchema.fields.map((f) => f.id))
     const newId = slugifyId(spec.label, existingIds)
 
-    // Default box geometry — admin can drag-tune in Layout mode.
     const width = 160
     const height = 14
     const size = 10
-    // Top-down click → pdf-lib baseline-y (bottom-up).
-    const baselineY =
-      template.dimensions.height - spec.y_top - height + 1
+    const baselineY = template.dimensions.height - spec.y_top - height + 1
 
     const isPeriodSpec =
       spec.semantic_type === "period_month" ||
@@ -204,7 +212,11 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
     )
     if (!res.ok) {
       const json = await res.json().catch(() => ({}))
-      return { ok: false, message: json.error ?? "Save failed" }
+      const msg =
+        json.error === "FieldLocked"
+          ? `Locked field(s): ${(json.fields ?? []).join(", ")}`
+          : (json.error ?? "Save failed")
+      return { ok: false, message: msg }
     }
     router.refresh()
     return { ok: true, message: `Added "${spec.label}" on page ${spec.page}` }
@@ -231,8 +243,6 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
       merged[id] = {
         ...spec,
         x: spec.x + o.dx,
-        // Baseline-y compensated by -dh so the rendered text top stays
-        // where the admin dragged it during resize.
         y: spec.y + o.dy - dh,
         width: Math.max(20, baseW + dw),
         height: Math.max(8, baseH + dh),
@@ -248,18 +258,22 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
     )
     if (!res.ok) {
       const json = await res.json().catch(() => ({}))
-      return { ok: false, message: json.error ?? "Save failed" }
+      const msg =
+        json.error === "FieldLocked"
+          ? `Locked field(s): ${(json.fields ?? []).join(", ")}. Wait for the other admin to finish.`
+          : (json.error ?? "Save failed")
+      return { ok: false, message: msg }
     }
     setOverrides({})
+    setActiveLayoutFields([])
     router.refresh()
     return { ok: true, message: "Layout saved" }
   }
 
   return (
     <div className="space-y-6">
-      <LockBanner state={lock} />
+      <PresenceBar presence={presence} />
 
-      {/* Metadata */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Metadata</CardTitle>
@@ -267,9 +281,7 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
         <CardContent className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="form_code" className="text-xs">
-                Form code
-              </Label>
+              <Label htmlFor="form_code" className="text-xs">Form code</Label>
               <Input
                 id="form_code"
                 value={meta.form_code}
@@ -278,29 +290,15 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="agency" className="text-xs">
-                Issuer
-              </Label>
-              <Input
-                id="agency"
-                value={agency}
-                onChange={(e) => setAgency(e.target.value)}
-              />
+              <Label htmlFor="agency" className="text-xs">Issuer</Label>
+              <Input id="agency" value={agency} onChange={(e) => setAgency(e.target.value)} />
             </div>
             <div className="md:col-span-2 space-y-1.5">
-              <Label htmlFor="form_name" className="text-xs">
-                Form name
-              </Label>
-              <Input
-                id="form_name"
-                value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-              />
+              <Label htmlFor="form_name" className="text-xs">Form name</Label>
+              <Input id="form_name" value={formName} onChange={(e) => setFormName(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="frequency" className="text-xs">
-                Filing frequency
-              </Label>
+              <Label htmlFor="frequency" className="text-xs">Filing frequency</Label>
               <select
                 id="frequency"
                 value={frequency}
@@ -315,9 +313,7 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="is_active" className="text-xs">
-                Status
-              </Label>
+              <Label htmlFor="is_active" className="text-xs">Status</Label>
               <div className="flex items-center h-10 gap-2 text-sm">
                 <input
                   id="is_active"
@@ -327,9 +323,7 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
                   className="size-4"
                 />
                 <span className="text-muted-foreground">
-                  {isActive
-                    ? "Active — appears in /forms"
-                    : "Disabled — hidden from users"}
+                  {isActive ? "Active — appears in /forms" : "Disabled — hidden from users"}
                 </span>
               </div>
             </div>
@@ -355,9 +349,7 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
               </div>
             </div>
             <div className="md:col-span-2 space-y-1.5">
-              <Label htmlFor="description" className="text-xs">
-                Description (admin-only)
-              </Label>
+              <Label htmlFor="description" className="text-xs">Description (admin-only)</Label>
               <textarea
                 id="description"
                 value={description}
@@ -370,33 +362,23 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
           </div>
           {meta.last_checked_at && (
             <p className="text-xs text-muted-foreground">
-              Last source check{" "}
-              <time>{new Date(meta.last_checked_at).toLocaleString()}</time>
+              Last source check <time>{new Date(meta.last_checked_at).toLocaleString()}</time>
               {meta.last_changed_at && (
-                <>
-                  {" · "}Last change{" "}
-                  <time>
-                    {new Date(meta.last_changed_at).toLocaleString()}
-                  </time>
-                </>
+                <> · Last change <time>{new Date(meta.last_changed_at).toLocaleString()}</time></>
               )}
             </p>
           )}
           <div className="flex justify-end">
             <Button onClick={saveMeta} disabled={savingMeta} size="sm" className="gap-2">
-              {savingMeta ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Save className="size-4" />
-              )}
+              {savingMeta ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
               Save metadata
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* WYSIWYG layout */}
-      {fieldSchema ? (
+      {/* WYSIWYG layout (coordinate templates) */}
+      {fieldSchema && template.mapping.strategy === "coordinates" && (
         <Card>
           <CardHeader className="pb-3 flex flex-row items-start justify-between gap-3">
             <div className="space-y-1">
@@ -409,22 +391,18 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
             </div>
             <div className="flex gap-2 shrink-0 flex-wrap justify-end">
               <TemplateExportButton formCode={meta.form_code} />
-              {template.mapping.strategy === "coordinates" && !isViewer && (
-                <ReanalyzeAIButton
-                  formCode={meta.form_code}
-                  formName={meta.form_name}
-                  agency={meta.agency}
-                  dimensions={template.dimensions}
-                  existingFields={fieldSchema.fields}
-                  existingMapping={template.mapping.fields}
-                />
-              )}
-              {!isViewer && (
-                <ReplacePdfButton
-                  formCode={meta.form_code}
-                  currentPageCount={template.dimensions.pageCount}
-                />
-              )}
+              <ReanalyzeAIButton
+                formCode={meta.form_code}
+                formName={meta.form_name}
+                agency={meta.agency}
+                dimensions={template.dimensions}
+                existingFields={fieldSchema.fields}
+                existingMapping={template.mapping.fields}
+              />
+              <ReplacePdfButton
+                formCode={meta.form_code}
+                currentPageCount={template.dimensions.pageCount}
+              />
             </div>
           </CardHeader>
           <CardContent>
@@ -436,25 +414,62 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
                 label: f.label,
                 required: f.required,
               }))}
-              // Use the field labels themselves as placeholder values so
-              // the admin can see what's where on the form without a
-              // company picked.
               values={Object.fromEntries(
                 fieldSchema.fields.map((f) => [f.id, `[${f.label}]`]),
               )}
-              onChange={() => {
-                /* read-only in admin layout view */
-              }}
+              onChange={() => {}}
               overrides={overrides}
               onOverrideChange={setOverride}
               onReplaceOverrides={setOverrides}
               isAdmin
-              onSaveAsTemplate={isViewer ? undefined : saveLayout}
-              onAddField={isViewer ? undefined : addFieldAtPosition}
+              onSaveAsTemplate={saveLayout}
+              onAddField={addFieldAtPosition}
+              fieldLocksByOther={Object.fromEntries(
+                Object.entries(presence.editingFields)
+                  .filter(([, v]) => v.user_id !== presence.myUserId)
+                  .map(([fid, v]) => [fid, v]),
+              )}
             />
           </CardContent>
         </Card>
-      ) : (
+      )}
+
+      {/* AcroForm mapping (acroform templates) */}
+      {fieldSchema && template.mapping.strategy === "acroform" && (
+        <Card>
+          <CardHeader className="pb-3 flex flex-row items-start justify-between gap-3">
+            <div className="space-y-1">
+              <CardTitle className="text-base">AcroForm mapping</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                This PDF has built-in form widgets. Map each schema field
+                to the PDF widget it should fill.
+              </p>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <TemplateExportButton formCode={meta.form_code} />
+              <ReplacePdfButton
+                formCode={meta.form_code}
+                currentPageCount={template.dimensions.pageCount}
+              />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <AcroFormMappingEditor
+              formCode={meta.form_code}
+              fields={fieldSchema.fields.map((f) => ({ id: f.id, label: f.label }))}
+              initialMapping={template.mapping.fields}
+              fieldLocksByOther={Object.fromEntries(
+                Object.entries(presence.editingFields)
+                  .filter(([, v]) => v.user_id !== presence.myUserId)
+                  .map(([fid, v]) => [fid, v]),
+              )}
+              onActiveFieldsChange={setActiveLayoutFields}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {!fieldSchema && (
         <Card>
           <CardContent className="p-6 flex items-start gap-3">
             <AlertCircle className="size-5 text-amber-600 mt-0.5" />
@@ -489,7 +504,12 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
               formName={meta.form_name}
               agency={meta.agency}
               initialFields={fieldSchema.fields}
-              readOnly={isViewer}
+              fieldLocksByOther={Object.fromEntries(
+                Object.entries(presence.editingFields)
+                  .filter(([, v]) => v.user_id !== presence.myUserId)
+                  .map(([fid, v]) => [fid, v]),
+              )}
+              onActiveFieldsChange={setActiveSchemaFields}
             />
           </CardContent>
         </Card>
@@ -498,57 +518,21 @@ export function TemplateDetailEditor({ template, meta, fieldSchema }: Props) {
   )
 }
 
-function LockBanner({
-  state,
+function PresenceBar({
+  presence,
 }: {
-  state: ReturnType<typeof useTemplateLock>
+  presence: ReturnType<typeof useTemplatePresence>
 }) {
-  if (state.mode === "loading") return null
-  if (state.mode === "error") {
-    return (
-      <div className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-2 text-sm text-destructive inline-flex items-center gap-2">
-        <AlertCircle className="size-4" />
-        Lock check failed: {state.error}. Edits may collide with another
-        admin — refresh to retry.
-      </div>
-    )
-  }
-  if (state.mode === "viewer") {
-    return (
-      <div className="rounded-md border border-amber-500/40 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm flex items-center justify-between gap-3">
-        <div className="flex items-start gap-2">
-          <Lock className="size-4 text-amber-700 dark:text-amber-300 mt-0.5 shrink-0" />
-          <div className="text-amber-900 dark:text-amber-100">
-            <span className="font-medium">
-              {state.holder.email ?? "Another admin"}
-            </span>{" "}
-            is editing this template (locked{" "}
-            <time className="tabular-nums">
-              {new Date(state.holder.since).toLocaleTimeString()}
-            </time>
-            ). Your saves will be refused until they release. The page
-            will unlock automatically when they leave.
-          </div>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={state.takeover}
-          className="shrink-0 gap-2 border-amber-600/40"
-        >
-          <Unlock className="size-3.5" />
-          Take over
-        </Button>
-      </div>
-    )
-  }
-  if (state.tookOver) {
-    return (
-      <div className="rounded-md border border-green-600/30 bg-green-50 dark:bg-green-950/30 px-4 py-2 text-xs text-green-900 dark:text-green-100 inline-flex items-center gap-2">
-        <CheckCircle2 className="size-3.5" />
-        Lock taken over. You are now the editor.
-      </div>
-    )
-  }
-  return null
+  if (presence.others.length === 0) return null
+  const names = presence.others.map((o) => o.email ?? "anon").join(", ")
+  return (
+    <div className="rounded-md border border-amber-500/40 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-xs flex items-center gap-2 text-amber-900 dark:text-amber-100">
+      <Users className="size-3.5" />
+      <span>
+        Also editing this template: <strong>{names}</strong>. Per-field
+        locks prevent overlapping edits — your save will be refused if
+        you touch a field they&apos;re working on.
+      </span>
+    </div>
+  )
 }

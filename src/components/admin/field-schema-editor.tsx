@@ -1,10 +1,11 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   CheckCircle2,
   Loader2,
+  Lock,
   Plus,
   Save,
   Trash2,
@@ -78,23 +79,22 @@ function slugify(label: string): string {
   )
 }
 
-/**
- * `editable` adds a freshly-typed `id` for new fields so we can rename
- * them before the first save (after which the id is locked because the
- * coord map references it).
- */
 type EditableField = SchemaField & {
-  /** Was this field present in the original payload? */
   isOriginal: boolean
 }
+
+type FieldLockInfo = { email: string | null; at: string }
 
 type Props = {
   formCode: string
   formName: string
   agency: string
   initialFields: SchemaField[]
-  /** Render in view-only mode (someone else holds the lock). */
-  readOnly?: boolean
+  /** Per-field locks held by OTHER admins, keyed by schema id. */
+  fieldLocksByOther?: Record<string, FieldLockInfo>
+  /** Reports which field ids this editor is actively working on so
+   * the parent's presence heartbeat can keep their locks fresh. */
+  onActiveFieldsChange?: (ids: string[]) => void
 }
 
 export function FieldSchemaEditor({
@@ -102,7 +102,8 @@ export function FieldSchemaEditor({
   formName,
   agency,
   initialFields,
-  readOnly = false,
+  fieldLocksByOther = {},
+  onActiveFieldsChange,
 }: Props) {
   const router = useRouter()
   const [fields, setFields] = useState<EditableField[]>(() =>
@@ -115,6 +116,13 @@ export function FieldSchemaEditor({
   const [bulkSemanticType, setBulkSemanticType] = useState("text")
   const [dirty, setDirty] = useState(false)
   const [selected, setSelected] = useState<Set<number>>(new Set())
+  // Field ids the admin has touched since the last save → reported up
+  // so the presence heartbeat claims them as field locks.
+  const [touched, setTouched] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    onActiveFieldsChange?.(Array.from(touched))
+  }, [touched, onActiveFieldsChange])
 
   const allSelected = useMemo(
     () => fields.length > 0 && selected.size === fields.length,
@@ -124,6 +132,19 @@ export function FieldSchemaEditor({
 
   function markDirty() {
     setDirty(true)
+  }
+
+  function markTouched(id: string) {
+    setTouched((prev) => {
+      if (prev.has(id)) return prev
+      const next = new Set(prev)
+      next.add(id)
+      return next
+    })
+  }
+
+  function isLockedByOther(id: string) {
+    return Boolean(fieldLocksByOther[id])
   }
 
   function toggleRow(i: number, on: boolean) {
@@ -145,6 +166,8 @@ export function FieldSchemaEditor({
       next[i] = { ...next[i], ...patch }
       return next
     })
+    const id = fields[i]?.id
+    if (id) markTouched(id)
     markDirty()
   }
 
@@ -168,25 +191,33 @@ export function FieldSchemaEditor({
     setFields((prev) => prev.filter((f) => f !== target))
     setConfirmDelete(null)
     setSelected(new Set())
+    markTouched(target.id)
     markDirty()
   }
 
   function bulkDelete() {
     if (selected.size === 0) return
+    const removedIds = fields.filter((_, i) => selected.has(i)).map((f) => f.id)
     setFields((prev) => prev.filter((_, i) => !selected.has(i)))
     setSelected(new Set())
     setConfirmBulkDelete(false)
+    setTouched((prev) => {
+      const next = new Set(prev)
+      for (const id of removedIds) next.add(id)
+      return next
+    })
     markDirty()
   }
 
   function bulkApplySemanticType(type: string) {
     if (selected.size === 0) return
     setFields((prev) =>
-      prev.map((f, i) =>
-        selected.has(i) ? { ...f, semantic_type: type } : f,
-      ),
+      prev.map((f, i) => (selected.has(i) ? { ...f, semantic_type: type } : f)),
     )
     setBulkSemanticOpen(false)
+    fields.forEach((f, i) => {
+      if (selected.has(i)) markTouched(f.id)
+    })
     markDirty()
   }
 
@@ -227,11 +258,11 @@ export function FieldSchemaEditor({
     setSaving(false)
     if (!res.ok) {
       const json = await res.json().catch(() => ({}))
-      toast({
-        variant: "destructive",
-        title: "Save failed",
-        description: json.error ?? "Try again.",
-      })
+      const description =
+        json.error === "FieldLocked"
+          ? `Locked field(s): ${(json.fields ?? []).join(", ")}. Wait for the other admin to finish.`
+          : (json.error ?? "Try again.")
+      toast({ variant: "destructive", title: "Save failed", description })
       return
     }
     toast({
@@ -240,6 +271,7 @@ export function FieldSchemaEditor({
       description: `${fields.length} field${fields.length === 1 ? "" : "s"} in this template.`,
     })
     setDirty(false)
+    setTouched(new Set())
     setFields((prev) => prev.map((f) => ({ ...f, isOriginal: true })))
     router.refresh()
   }
@@ -308,125 +340,137 @@ export function FieldSchemaEditor({
             </tr>
           </thead>
           <tbody>
-            {fields.map((f, i) => (
-              <tr
-                key={i}
-                className={cn(
-                  "border-t",
-                  selected.has(i) && "bg-muted/30",
-                )}
-              >
-                <td className="px-2 py-2 align-top text-center">
-                  <input
-                    type="checkbox"
-                    checked={selected.has(i)}
-                    onChange={(e) => toggleRow(i, e.target.checked)}
-                    aria-label={`Select ${f.label || f.id}`}
-                    className="size-3.5 mt-1"
-                  />
-                </td>
-                <td className="px-3 py-2 align-top">
-                  <Input
-                    value={f.id}
-                    onChange={(e) => {
-                      // Only allow id edits before first save (otherwise
-                      // the coord map's reference would break).
-                      if (f.isOriginal) return
-                      update(i, { id: slugify(e.target.value) })
-                    }}
-                    readOnly={f.isOriginal}
-                    className={cn(
-                      "font-mono text-[11px] h-8",
-                      f.isOriginal && "bg-muted/40 cursor-not-allowed",
-                    )}
-                  />
-                </td>
-                <td className="px-3 py-2 align-top">
-                  <Input
-                    value={f.label}
-                    onChange={(e) => {
-                      const nextLabel = e.target.value
-                      // For new fields, auto-sync id off label until the
-                      // admin types directly into the id box.
-                      const patch: Partial<EditableField> = { label: nextLabel }
-                      if (!f.isOriginal) {
-                        patch.id = slugify(nextLabel)
+            {fields.map((f, i) => {
+              const lock = fieldLocksByOther[f.id]
+              const locked = !!lock
+              return (
+                <tr
+                  key={i}
+                  className={cn(
+                    "border-t",
+                    selected.has(i) && "bg-muted/30",
+                    locked && "bg-amber-50/40 dark:bg-amber-950/20",
+                  )}
+                >
+                  <td className="px-2 py-2 align-top text-center">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(i)}
+                      onChange={(e) => toggleRow(i, e.target.checked)}
+                      aria-label={`Select ${f.label || f.id}`}
+                      className="size-3.5 mt-1"
+                      disabled={locked}
+                    />
+                  </td>
+                  <td className="px-3 py-2 align-top">
+                    <div className="flex items-center gap-1.5">
+                      {locked && (
+                        <span
+                          className="inline-flex"
+                          title={`Locked by ${lock.email ?? "another admin"}`}
+                        >
+                          <Lock className="size-3 text-amber-600" />
+                        </span>
+                      )}
+                      <Input
+                        value={f.id}
+                        onChange={(e) => {
+                          if (f.isOriginal) return
+                          update(i, { id: slugify(e.target.value) })
+                        }}
+                        readOnly={f.isOriginal || locked}
+                        className={cn(
+                          "font-mono text-[11px] h-8",
+                          (f.isOriginal || locked) && "bg-muted/40 cursor-not-allowed",
+                        )}
+                      />
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 align-top">
+                    <Input
+                      value={f.label}
+                      onChange={(e) => {
+                        const nextLabel = e.target.value
+                        const patch: Partial<EditableField> = { label: nextLabel }
+                        if (!f.isOriginal) {
+                          patch.id = slugify(nextLabel)
+                        }
+                        update(i, patch)
+                      }}
+                      disabled={locked}
+                      className="h-8"
+                    />
+                  </td>
+                  <td className="px-3 py-2 align-top">
+                    <select
+                      value={f.semantic_type}
+                      onChange={(e) => update(i, { semantic_type: e.target.value })}
+                      disabled={locked}
+                      className="flex h-8 w-full rounded-md border border-input bg-background px-2 text-xs disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {SEMANTIC_TYPES.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-3 py-2 align-top">
+                    <Input
+                      list={`data-source-suggestions-${i}`}
+                      value={f.data_source ?? ""}
+                      onChange={(e) =>
+                        update(i, { data_source: e.target.value || null })
                       }
-                      update(i, patch)
-                    }}
-                    className="h-8"
-                  />
-                </td>
-                <td className="px-3 py-2 align-top">
-                  <select
-                    value={f.semantic_type}
-                    onChange={(e) =>
-                      update(i, { semantic_type: e.target.value })
-                    }
-                    className="flex h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
-                  >
-                    {SEMANTIC_TYPES.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="px-3 py-2 align-top">
-                  <Input
-                    list={`data-source-suggestions-${i}`}
-                    value={f.data_source ?? ""}
-                    onChange={(e) =>
-                      update(i, { data_source: e.target.value || null })
-                    }
-                    placeholder="— None —"
-                    className="font-mono text-[11px] h-8"
-                  />
-                  <datalist id={`data-source-suggestions-${i}`}>
-                    {DATA_SOURCE_SUGGESTIONS.map((s) => (
-                      <option key={s} value={s} />
-                    ))}
-                  </datalist>
-                </td>
-                <td className="px-3 py-2 align-top text-center">
-                  <input
-                    type="checkbox"
-                    checked={f.required}
-                    onChange={(e) => update(i, { required: e.target.checked })}
-                    className="size-4"
-                  />
-                </td>
-                <td className="px-3 py-2 align-top text-center">
-                  <input
-                    type="checkbox"
-                    checked={f.period_specific}
-                    onChange={(e) =>
-                      update(i, { period_specific: e.target.checked })
-                    }
-                    className="size-4"
-                  />
-                </td>
-                <td className="px-2 align-top pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (f.isOriginal) setConfirmDelete(f)
-                      else removeField(f)
-                    }}
-                    className="text-muted-foreground hover:text-destructive"
-                    title="Remove field"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
-                </td>
-              </tr>
-            ))}
+                      disabled={locked}
+                      placeholder="— None —"
+                      className="font-mono text-[11px] h-8"
+                    />
+                    <datalist id={`data-source-suggestions-${i}`}>
+                      {DATA_SOURCE_SUGGESTIONS.map((s) => (
+                        <option key={s} value={s} />
+                      ))}
+                    </datalist>
+                  </td>
+                  <td className="px-3 py-2 align-top text-center">
+                    <input
+                      type="checkbox"
+                      checked={f.required}
+                      onChange={(e) => update(i, { required: e.target.checked })}
+                      disabled={locked}
+                      className="size-4"
+                    />
+                  </td>
+                  <td className="px-3 py-2 align-top text-center">
+                    <input
+                      type="checkbox"
+                      checked={f.period_specific}
+                      onChange={(e) =>
+                        update(i, { period_specific: e.target.checked })
+                      }
+                      disabled={locked}
+                      className="size-4"
+                    />
+                  </td>
+                  <td className="px-2 align-top pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (locked) return
+                        if (f.isOriginal) setConfirmDelete(f)
+                        else removeField(f)
+                      }}
+                      disabled={locked}
+                      className="text-muted-foreground hover:text-destructive disabled:cursor-not-allowed disabled:opacity-30"
+                      title={locked ? "Locked" : "Remove field"}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
             {fields.length === 0 && (
               <tr>
-                <td
-                  colSpan={8}
-                  className="px-3 py-6 text-center text-muted-foreground"
-                >
+                <td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">
                   No fields yet — add one below.
                 </td>
               </tr>
@@ -436,13 +480,7 @@ export function FieldSchemaEditor({
       </div>
 
       <div className="flex items-center justify-between">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={addField}
-          disabled={readOnly}
-          className="gap-2"
-        >
+        <Button variant="outline" size="sm" onClick={addField} className="gap-2">
           <Plus className="size-4" />
           Add field
         </Button>
@@ -453,31 +491,14 @@ export function FieldSchemaEditor({
               Unsaved changes
             </span>
           )}
-          {readOnly && (
-            <span className="text-xs text-amber-700 dark:text-amber-300">
-              Locked by another admin
-            </span>
-          )}
-          <Button
-            onClick={save}
-            disabled={!dirty || saving || readOnly}
-            size="sm"
-            className="gap-2"
-          >
-            {saving ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Save className="size-4" />
-            )}
+          <Button onClick={save} disabled={!dirty || saving} size="sm" className="gap-2">
+            {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
             Save fields
           </Button>
         </div>
       </div>
 
-      <Dialog
-        open={confirmDelete !== null}
-        onOpenChange={(o) => !o && setConfirmDelete(null)}
-      >
+      <Dialog open={confirmDelete !== null} onOpenChange={(o) => !o && setConfirmDelete(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Remove this field?</DialogTitle>
@@ -506,10 +527,7 @@ export function FieldSchemaEditor({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <Dialog
-        open={confirmBulkDelete}
-        onOpenChange={setConfirmBulkDelete}
-      >
+      <Dialog open={confirmBulkDelete} onOpenChange={setConfirmBulkDelete}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -525,11 +543,7 @@ export function FieldSchemaEditor({
             <DialogClose asChild>
               <Button variant="outline">Cancel</Button>
             </DialogClose>
-            <Button
-              variant="destructive"
-              onClick={bulkDelete}
-              className="gap-2"
-            >
+            <Button variant="destructive" onClick={bulkDelete} className="gap-2">
               <CheckCircle2 className="size-4" />
               Remove {selected.size}
             </Button>
@@ -537,10 +551,7 @@ export function FieldSchemaEditor({
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={bulkSemanticOpen}
-        onOpenChange={setBulkSemanticOpen}
-      >
+      <Dialog open={bulkSemanticOpen} onOpenChange={setBulkSemanticOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Set semantic type on {selected.size}</DialogTitle>
@@ -555,19 +566,14 @@ export function FieldSchemaEditor({
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
           >
             {SEMANTIC_TYPES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
+              <option key={s} value={s}>{s}</option>
             ))}
           </select>
           <DialogFooter className="gap-2">
             <DialogClose asChild>
               <Button variant="outline">Cancel</Button>
             </DialogClose>
-            <Button
-              onClick={() => bulkApplySemanticType(bulkSemanticType)}
-              className="gap-2"
-            >
+            <Button onClick={() => bulkApplySemanticType(bulkSemanticType)} className="gap-2">
               <CheckCircle2 className="size-4" />
               Apply
             </Button>

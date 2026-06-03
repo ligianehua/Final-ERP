@@ -9,6 +9,7 @@ import {
   FileText,
   History,
   LayoutDashboard,
+  ScrollText,
   Shield,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -26,6 +27,7 @@ export const NAV_ITEMS: NavItem[] = [
 
 export const ADMIN_NAV_ITEMS: NavItem[] = [
   { href: "/admin/templates", label: "Templates", icon: Shield },
+  { href: "/admin/audit", label: "Audit log", icon: ScrollText },
 ]
 
 /**

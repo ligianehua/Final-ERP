@@ -15,6 +15,17 @@ import {
 import { VATExtractor } from "./vat-extractor"
 import { FormImagePrefill } from "./form-image-prefill"
 
+// Cloud draft helper: URL builder for the slot-keyed REST endpoint.
+function cloudDraftUrl(
+  formCode: string,
+  companyId: string,
+  signatoryId: string | null,
+): string {
+  const p = new URLSearchParams({ company_id: companyId })
+  if (signatoryId) p.set("signatory_id", signatoryId)
+  return `/api/forms/drafts/${encodeURIComponent(formCode)}?${p.toString()}`
+}
+
 function draftKey(
   formCode: string,
   companyId: string,
@@ -321,10 +332,43 @@ export function FillFlow({
     // one for restore. Doing this on every fill (re-pick company, etc.)
     // is correct — each combo has its own slot.
     setDraftWritable(false)
-    const existing = readDraft(draftKey(formCode, cid, json.signatory_id))
-    setPendingDraft(existing)
-    if (!existing) setDraftWritable(true)
+    const localDraft = readDraft(draftKey(formCode, cid, json.signatory_id))
+    setPendingDraft(localDraft)
+    if (!localDraft) setDraftWritable(true)
     setLoading(false)
+
+    // In parallel: ask the cloud for a draft. If the cloud's copy is
+    // newer than what localStorage offered (e.g. user started on
+    // their phone, then switched to the laptop), upgrade the
+    // restore-prompt to the cloud version. Best-effort — failures
+    // leave the local draft prompt as-is.
+    fetch(cloudDraftUrl(formCode, cid, json.signatory_id), { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        const cloud = j?.draft as
+          | {
+              values: Record<string, string>
+              overrides: Record<string, unknown>
+              period: string | null
+              updated_at: string
+            }
+          | null
+          | undefined
+        if (!cloud) return
+        const cloudTs = Date.parse(cloud.updated_at)
+        const localTs = localDraft ? Date.parse(localDraft.saved_at) : 0
+        if (cloudTs <= localTs) return
+        setPendingDraft({
+          saved_at: cloud.updated_at,
+          values: cloud.values,
+          overrides: cloud.overrides as DraftSnapshot["overrides"],
+          period: cloud.period ?? "",
+        })
+        setDraftWritable(false)
+      })
+      .catch(() => {
+        // Silent — local fallback still works.
+      })
   }
 
   function restoreDraft() {
@@ -343,6 +387,11 @@ export function FillFlow({
         draftKey(formCode, companyId, signatoryId),
       )
     } catch {}
+    // Also nuke the cloud copy — discarding means "don't pester me
+    // with this draft from any device".
+    fetch(cloudDraftUrl(formCode, companyId, signatoryId), {
+      method: "DELETE",
+    }).catch(() => {})
     setPendingDraft(null)
     setDraftWritable(true)
   }
@@ -350,10 +399,12 @@ export function FillFlow({
   // Debounced autosave once the slot is "writable" (after the restore
   // prompt has been handled). Skipped on the very first render so the
   // archive-prefill alone doesn't immediately get persisted as a draft.
+  // localStorage saves at 600ms for snappy local restore; cloud saves
+  // at 2s to keep server traffic gentle.
   useEffect(() => {
     if (!companyId || !draftWritable) return
     const key = draftKey(formCode, companyId, signatoryId)
-    const timer = setTimeout(() => {
+    const local = setTimeout(() => {
       try {
         const snapshot: DraftSnapshot = {
           saved_at: new Date().toISOString(),
@@ -366,7 +417,25 @@ export function FillFlow({
         // Quota exceeded or private mode — silently fail.
       }
     }, 600)
-    return () => clearTimeout(timer)
+    const cloud = setTimeout(() => {
+      fetch(cloudDraftUrl(formCode, companyId, signatoryId), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_id: companyId,
+          signatory_id: signatoryId,
+          values,
+          overrides,
+          period: period || null,
+        }),
+      }).catch(() => {
+        // Offline / 5xx — localStorage still has it.
+      })
+    }, 2000)
+    return () => {
+      clearTimeout(local)
+      clearTimeout(cloud)
+    }
   }, [
     companyId,
     signatoryId,
@@ -500,6 +569,9 @@ export function FillFlow({
           draftKey(formCode, companyId, signatoryId),
         )
       } catch {}
+      fetch(cloudDraftUrl(formCode, companyId, signatoryId), {
+        method: "DELETE",
+      }).catch(() => {})
     }
 
     if (candidates.length > 0) {

@@ -7,6 +7,7 @@ import { NextResponse } from "next/server"
 import { PDFDocument } from "pdf-lib"
 import { createClient } from "@/lib/db/server"
 import { isAdminEmail } from "@/lib/auth/admin"
+import { logAudit } from "@/lib/audit/log"
 import { convertToPdf } from "@/lib/convert/to-pdf"
 import {
   getExtension,
@@ -223,6 +224,17 @@ export async function POST(request: Request, { params }: Params) {
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 500 })
   }
+
+  await logAudit(supabase, {
+    actor: { id: user.id, email: user.email ?? null },
+    action: "template.replace_pdf",
+    target: { kind: "form_template", id: form_code },
+    after: {
+      pages_uploaded: pagesUploaded,
+      dimensions,
+      orphan_field_ids: orphans,
+    },
+  })
 
   return NextResponse.json({
     success: true,

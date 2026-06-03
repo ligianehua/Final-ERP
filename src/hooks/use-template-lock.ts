@@ -2,130 +2,105 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 
-type LockHolder = {
+export type FieldLock = {
+  user_id: string
   email: string | null
-  since: string
+  at: string
 }
 
-export type LockState =
-  | { mode: "loading" }
-  | { mode: "editor"; holder: LockHolder; tookOver: boolean }
-  | { mode: "viewer"; holder: LockHolder }
-  | { mode: "error"; error: string }
+export type Session = {
+  email: string | null
+  at: string
+}
+
+export type PresenceState = {
+  /** Map of session id -> presence entry, including me. */
+  sessions: Record<string, Session>
+  /** Field-level locks, keyed by field id. */
+  editingFields: Record<string, FieldLock>
+  /** Whoever isn't me. */
+  others: Array<{ user_id: string } & Session>
+  myUserId: string | null
+}
 
 /**
- * Template-level editing lock. Acquires on mount, heartbeats every
- * 10s, releases on unmount.
+ * Template presence + heartbeat. Many admins can be in the same
+ * template at once; this hook just keeps my session and any field
+ * locks I claim fresh and reports who else is around.
  *
- * The viewer path polls at the same interval — when the holder
- * disappears (closed tab, network drop), the viewer transparently
- * upgrades to editor without a page reload.
+ * Pass `heldFields` whenever the set of fields I'm actively editing
+ * changes — the next heartbeat refreshes those locks. (Use
+ * `useFieldLock` for explicit claim/release of a single field.)
  */
-export function useTemplateLock(formCode: string): LockState & {
-  takeover: () => Promise<void>
-  release: () => Promise<void>
-} {
-  const [state, setState] = useState<LockState>({ mode: "loading" })
-  // Ref mirror of `mode === "editor"` so the unmount cleanup can read
-  // the latest value without re-binding the effect.
-  const heldRef = useRef(false)
+export function useTemplatePresence(
+  formCode: string,
+  heldFields: string[] = [],
+): PresenceState {
+  const [state, setState] = useState<
+    Omit<PresenceState, "others" | "myUserId">
+  >({
+    sessions: {},
+    editingFields: {},
+  })
+  const myIdRef = useRef<string | null>(null)
+  // Latest fields-to-refresh, read fresh on each tick without
+  // re-binding the heartbeat effect.
+  const heldRef = useRef<string[]>(heldFields)
+  heldRef.current = heldFields
 
   const url = `/api/forms/templates/${encodeURIComponent(formCode)}/lock`
 
-  const tryAcquire = useCallback(
-    async (takeover: boolean): Promise<LockState> => {
-      try {
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ takeover }),
-        })
-        const json = await res.json().catch(() => ({}))
-        if (res.ok) {
-          heldRef.current = true
-          return {
-            mode: "editor",
-            holder: json.holder,
-            tookOver: !!json.took_over,
-          }
-        }
-        if (res.status === 409) {
-          heldRef.current = false
-          return { mode: "viewer", holder: json.holder }
-        }
-        return {
-          mode: "error",
-          error: json.error ?? `HTTP ${res.status}`,
-        }
-      } catch (err) {
-        return {
-          mode: "error",
-          error: err instanceof Error ? err.message : "Network error",
-        }
-      }
-    },
-    [url],
-  )
+  const beat = useCallback(async () => {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fields: heldRef.current }),
+      })
+      if (!res.ok) return
+      const json = await res.json()
+      myIdRef.current = json.me?.user_id ?? myIdRef.current
+      setState({
+        sessions: json.sessions ?? {},
+        editingFields: json.editing_fields ?? {},
+      })
+    } catch {
+      // Best-effort heartbeat. Loop continues.
+    }
+  }, [url])
 
   useEffect(() => {
-    let cancelled = false
-
-    async function tick(takeover = false) {
-      const next = await tryAcquire(takeover)
-      if (cancelled) return
-      setState(next)
-    }
-
-    tick(false)
-    const id = window.setInterval(() => tick(false), 10_000)
-
+    beat()
+    const id = window.setInterval(beat, 10_000)
     return () => {
-      cancelled = true
       window.clearInterval(id)
-      if (heldRef.current) {
-        // Best-effort release. fetch with keepalive lets the request
-        // outlive the unmount; the browser may also send beacons.
-        try {
-          fetch(url, { method: "DELETE", keepalive: true }).catch(() => {})
-        } catch {
-          // Swallow — release will time out server-side via staleness.
-        }
-        heldRef.current = false
+      try {
+        fetch(url, { method: "DELETE", keepalive: true }).catch(() => {})
+      } catch {
+        // Server-side staleness will clean up.
       }
     }
-  }, [tryAcquire, url])
+  }, [beat, url])
 
-  // beforeunload: nudge a release for hard reloads / tab close. The
-  // server's 2-minute staleness window catches the rest.
   useEffect(() => {
     function handler() {
-      if (!heldRef.current) return
       try {
-        const blob = new Blob([JSON.stringify({})], {
-          type: "application/json",
-        })
-        navigator.sendBeacon?.(url + "?release=1", blob)
+        navigator.sendBeacon?.(
+          url + "?release=1",
+          new Blob([JSON.stringify({})], { type: "application/json" }),
+        )
       } catch {
-        // Beacon API can refuse; staleness window catches it.
+        /* fall through to staleness */
       }
     }
     window.addEventListener("beforeunload", handler)
     return () => window.removeEventListener("beforeunload", handler)
   }, [url])
 
-  const takeover = useCallback(async () => {
-    const next = await tryAcquire(true)
-    setState(next)
-  }, [tryAcquire])
+  const myUserId = myIdRef.current
+  const others = Object.entries(state.sessions)
+    .filter(([uid]) => uid !== myUserId)
+    .map(([user_id, s]) => ({ user_id, ...s }))
 
-  const release = useCallback(async () => {
-    try {
-      await fetch(url, { method: "DELETE" })
-    } catch {
-      // ignore
-    }
-    heldRef.current = false
-  }, [url])
-
-  return { ...state, takeover, release }
+  return { ...state, others, myUserId }
 }

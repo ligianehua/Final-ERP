@@ -86,6 +86,9 @@ type Props = {
     ok: boolean
     message: string
   }>
+  /** Per-field locks currently held by OTHER admins. Dragging /
+   * editing these cells is blocked; a small lock badge marks them. */
+  fieldLocksByOther?: Record<string, { email: string | null; at: string }>
 }
 
 /** Coords are in PDF points (top-down click position). The receiver
@@ -168,6 +171,7 @@ export function FormEditorOverlay({
   isAdmin = false,
   onSaveAsTemplate,
   onAddField,
+  fieldLocksByOther = {},
 }: Props) {
   const [displayWidth] = useState(MAX_DISPLAY_WIDTH)
   const [mode, setMode] = useState<EditMode>("values")
@@ -669,6 +673,7 @@ export function FormEditorOverlay({
                   highlighted={matchSet !== null && matchSet.has(id)}
                   snapToGrid={snapToGrid}
                   gridSize={GRID_SIZE}
+                  lockedByOther={fieldLocksByOther[id]}
                 />
               ))}
 
@@ -1057,6 +1062,7 @@ function FieldCell({
   highlighted,
   snapToGrid,
   gridSize,
+  lockedByOther,
 }: {
   id: string
   spec: CoordSpec
@@ -1085,6 +1091,8 @@ function FieldCell({
   /** Round drag deltas so the final absolute x/y lands on the grid. */
   snapToGrid?: boolean
   gridSize?: number
+  /** Held by another admin → block drag/resize, mark visually. */
+  lockedByOther?: { email: string | null; at: string }
 }) {
   const grid = gridSize ?? 5
   const size = spec.size ?? 10
@@ -1230,13 +1238,21 @@ function FieldCell({
 
       {mode === "layout" && (
         <div
-          onMouseDown={startDrag}
-          onDoubleClick={() => onOverrideChange(id, null)}
-          title={`${label} — drag to move, corner to resize, arrows to nudge (Shift = 10pt), double-click to reset`}
+          onMouseDown={lockedByOther ? undefined : startDrag}
+          onDoubleClick={
+            lockedByOther ? undefined : () => onOverrideChange(id, null)
+          }
+          title={
+            lockedByOther
+              ? `${label} — locked by ${lockedByOther.email ?? "another admin"}`
+              : `${label} — drag to move, corner to resize, arrows to nudge (Shift = 10pt), double-click to reset`
+          }
           className={cn(
-            "absolute cursor-move group transition-opacity",
-            "border border-blue-500/50 bg-blue-500/10 hover:bg-blue-500/20",
-            override && "border-amber-500/70 bg-amber-500/15",
+            "absolute group transition-opacity",
+            lockedByOther
+              ? "cursor-not-allowed border-2 border-amber-500/70 bg-amber-500/20"
+              : "cursor-move border border-blue-500/50 bg-blue-500/10 hover:bg-blue-500/20",
+            !lockedByOther && override && "border-amber-500/70 bg-amber-500/15",
             selected &&
               "ring-2 ring-primary ring-offset-1 border-primary/80 bg-primary/15",
             highlighted &&
@@ -1276,17 +1292,27 @@ function FieldCell({
           </span>
           {/* Bottom-right resize handle — visible on hover, anchored
               to the box's bottom-right corner. */}
-          <div
-            onMouseDown={startResize}
-            title="Drag to resize"
-            className={cn(
-              "absolute right-0 bottom-0 size-2.5 cursor-se-resize",
-              "bg-blue-600 opacity-0 group-hover:opacity-100",
-              "transition-opacity",
-              override && "bg-amber-600",
-            )}
-            style={{ transform: "translate(50%, 50%)" }}
-          />
+          {!lockedByOther && (
+            <div
+              onMouseDown={startResize}
+              title="Drag to resize"
+              className={cn(
+                "absolute right-0 bottom-0 size-2.5 cursor-se-resize",
+                "bg-blue-600 opacity-0 group-hover:opacity-100",
+                "transition-opacity",
+                override && "bg-amber-600",
+              )}
+              style={{ transform: "translate(50%, 50%)" }}
+            />
+          )}
+          {lockedByOther && (
+            <span
+              className="absolute -top-4 left-0 px-1 py-0.5 rounded text-[10px] whitespace-nowrap bg-amber-600 text-white pointer-events-none"
+              title={`Locked by ${lockedByOther.email ?? "another admin"}`}
+            >
+              🔒 {lockedByOther.email ?? "locked"}
+            </span>
+          )}
         </div>
       )}
     </>

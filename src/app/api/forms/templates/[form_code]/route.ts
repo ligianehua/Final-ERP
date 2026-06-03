@@ -7,7 +7,8 @@ import {
   serializeTemplate,
 } from "@/lib/forms/templates/effective"
 import { getTemplateConfig } from "@/lib/forms/templates"
-import { STALE_LOCK_MS } from "./lock/route"
+import { isFieldLockedByOther } from "./lock/route"
+import { logAudit } from "@/lib/audit/log"
 
 type Params = { params: Promise<{ form_code: string }> }
 
@@ -125,7 +126,7 @@ export async function PATCH(request: Request, { params }: Params) {
   const { data: existing } = await supabase
     .from("form_templates")
     .select(
-      "form_code, form_name, agency, dimensions, field_mapping, editing_by, editing_by_email, editing_at",
+      "form_code, form_name, agency, frequency, description, is_active, source_url, dimensions, field_mapping, field_schema, editing_fields",
     )
     .eq("form_code", form_code)
     .maybeSingle()
@@ -133,31 +134,50 @@ export async function PATCH(request: Request, { params }: Params) {
     return NextResponse.json({ error: "Unknown form_code" }, { status: 404 })
   }
 
-  // Refuse schema / mapping mutations when somebody else holds a
-  // fresh editing lock. Metadata-only edits (form_name, agency,
-  // frequency, etc) pass through — those are infrequent admin tasks
-  // and don't conflict with what the lock holder is doing in the
-  // WYSIWYG editor.
-  const isLayoutOrSchemaEdit =
-    parsed.data.field_mapping !== undefined ||
-    parsed.data.field_schema !== undefined
-  if (isLayoutOrSchemaEdit && existing?.editing_by && existing.editing_by !== user.id) {
-    const heldAt = existing.editing_at
-      ? Date.parse(existing.editing_at)
-      : 0
-    const isFresh = heldAt > 0 && Date.now() - heldAt < STALE_LOCK_MS
-    if (isFresh) {
-      return NextResponse.json(
-        {
-          error: "Locked",
-          holder: {
-            email: existing.editing_by_email,
-            since: existing.editing_at,
-          },
-        },
-        { status: 423 },
-      )
+  // Field-level lock enforcement. The coexistence model lets multiple
+  // admins edit the same template at once — provided they're not
+  // touching the same field. Any field whose mapping or schema entry
+  // would change here must be unheld or held by me.
+  const editingFields = existing?.editing_fields ?? {}
+  const conflictingFields: string[] = []
+  const oldMapping = (existing?.field_mapping ?? {}) as Record<string, unknown>
+  if (parsed.data.field_mapping) {
+    for (const [fid, next] of Object.entries(parsed.data.field_mapping)) {
+      const prev = oldMapping[fid]
+      const changed = JSON.stringify(prev) !== JSON.stringify(next)
+      if (!changed) continue
+      const other = isFieldLockedByOther(editingFields, fid, user.id)
+      if (other) conflictingFields.push(fid)
     }
+  }
+  if (parsed.data.field_schema) {
+    const oldSchemaFields =
+      (existing?.field_schema as { fields?: Array<{ id: string }> } | null)
+        ?.fields ?? []
+    const oldById = new Map(oldSchemaFields.map((f) => [f.id, f]))
+    for (const f of parsed.data.field_schema.fields) {
+      const prev = oldById.get(f.id)
+      const changed = !prev || JSON.stringify(prev) !== JSON.stringify(f)
+      if (!changed) continue
+      const other = isFieldLockedByOther(editingFields, f.id, user.id)
+      if (other) conflictingFields.push(f.id)
+    }
+    // Detect schema-row deletions — also need their locks free.
+    const newIds = new Set(parsed.data.field_schema.fields.map((f) => f.id))
+    for (const old of oldSchemaFields) {
+      if (newIds.has(old.id)) continue
+      const other = isFieldLockedByOther(editingFields, old.id, user.id)
+      if (other) conflictingFields.push(old.id)
+    }
+  }
+  if (conflictingFields.length > 0) {
+    return NextResponse.json(
+      {
+        error: "FieldLocked",
+        fields: conflictingFields,
+      },
+      { status: 423 },
+    )
   }
 
   // If field_schema is being edited, reconcile field_mapping so every
@@ -207,6 +227,54 @@ export async function PATCH(request: Request, { params }: Params) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  // Audit: separate entries per concern so the viewer can filter.
+  const actor = { id: user.id, email: user.email ?? null }
+  const target = { kind: "form_template" as const, id: form_code }
+  if (parsed.data.field_mapping) {
+    await logAudit(supabase, {
+      actor,
+      action: "template.update_field_mapping",
+      target,
+      before: { field_mapping: existing?.field_mapping ?? null },
+      after: { field_mapping: parsed.data.field_mapping },
+    })
+  }
+  if (parsed.data.field_schema) {
+    await logAudit(supabase, {
+      actor,
+      action: "template.update_schema",
+      target,
+      before: { field_schema: existing?.field_schema ?? null },
+      after: { field_schema: parsed.data.field_schema },
+    })
+  }
+  const metaKeys = [
+    "form_name",
+    "agency",
+    "frequency",
+    "description",
+    "is_active",
+    "source_url",
+  ] as const
+  const metaBefore: Record<string, unknown> = {}
+  const metaAfter: Record<string, unknown> = {}
+  for (const k of metaKeys) {
+    if (parsed.data[k] !== undefined) {
+      metaBefore[k] = (existing as Record<string, unknown> | undefined)?.[k] ?? null
+      metaAfter[k] = parsed.data[k]
+    }
+  }
+  if (Object.keys(metaAfter).length > 0) {
+    await logAudit(supabase, {
+      actor,
+      action: "template.update_metadata",
+      target,
+      before: metaBefore,
+      after: metaAfter,
+    })
+  }
+
   return NextResponse.json({ success: true })
 }
 
@@ -241,6 +309,12 @@ export async function DELETE(_request: Request, { params }: Params) {
   if (deleteError) {
     return NextResponse.json({ error: deleteError.message }, { status: 500 })
   }
+
+  await logAudit(supabase, {
+    actor: { id: user.id, email: user.email ?? null },
+    action: "template.delete",
+    target: { kind: "form_template", id: form_code },
+  })
 
   // Best-effort cleanup of Storage assets. Leaving orphans is acceptable
   // (a future GC job could sweep) but it's polite to clean up now.
