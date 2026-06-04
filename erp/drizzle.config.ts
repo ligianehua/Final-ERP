@@ -1,5 +1,11 @@
-import "dotenv/config";
+import { config as loadEnv } from "dotenv";
 import { defineConfig } from "drizzle-kit";
+
+// Next.js convention is .env.local for local-only secrets; vanilla
+// dotenv only reads .env. Load both so `pnpm db:migrate` and friends
+// pick up the same values Next.js does.
+loadEnv({ path: ".env.local", quiet: true });
+loadEnv({ quiet: true }); // falls back to .env
 
 const url = process.env.DATABASE_URL_DIRECT ?? process.env.DATABASE_URL;
 if (!url) {
