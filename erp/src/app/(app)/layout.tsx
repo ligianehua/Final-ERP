@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 
 import { getCurrentUser } from "@/lib/auth/session";
 import { getCurrentOrg, listMyOrgs } from "@/lib/orgs/current";
-import { visibleNavItems } from "@/components/layout/nav-items";
 import { Topbar } from "@/components/layout/topbar";
 import { Sidebar } from "@/components/layout/sidebar";
 
@@ -60,7 +59,6 @@ export default async function AppLayout({
     name: m.org.name,
     baseCurrency: m.org.baseCurrency,
   }));
-  const nav = visibleNavItems(current.role);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -71,7 +69,7 @@ export default async function AppLayout({
         activeOrgId={current.org.id}
       />
       <div className="flex flex-1 min-h-0">
-        <Sidebar items={nav} />
+        <Sidebar role={current.role} />
         <main className="flex-1 min-w-0 overflow-y-auto">{children}</main>
       </div>
     </div>

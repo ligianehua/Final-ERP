@@ -3,18 +3,23 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import type { NavItem } from "./nav-items";
+import { visibleNavItems } from "./nav-items";
+import type { OrgRole } from "@/lib/db/schema";
 
 /**
  * Desktop sidebar. Renders inside the (app) layout to the left of
  * the page content. Mobile uses a Sheet drawer toggled from the
  * topbar (Day 8 polish — not built yet).
  *
- * `items` is filtered server-side by the user's role before being
- * passed in, so nothing here cares about RBAC.
+ * We can't accept the NavItem[] array as a prop because each item
+ * carries a Lucide icon *component* (a function with $$typeof) and
+ * Next.js refuses to serialize that across the server → client
+ * boundary. Instead we take the user's role (a plain string) and
+ * filter the static nav-items list right here on the client.
  */
-export function Sidebar({ items }: { items: NavItem[] }) {
+export function Sidebar({ role }: { role: OrgRole }) {
   const pathname = usePathname();
+  const items = visibleNavItems(role);
 
   return (
     <nav
