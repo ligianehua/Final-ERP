@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The erp/ subproject has its own toolchain — don't lint it from here.
+    "erp/**",
   ]),
 ]);
 

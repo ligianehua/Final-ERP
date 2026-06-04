@@ -4,6 +4,47 @@
 
 ---
 
+## Week 1, Day 3 — 2026-06-04
+
+### Done
+- `src/proxy.ts`（Next.js 16 把 `middleware` 改名 `proxy`，已经按官方 doc 写法）：
+  - 每次请求刷新 Supabase session cookie
+  - 粗粒度 auth gate：未登录访问 `/dashboard /items /warehouses /parties /sales /purchases /reports /settings` 都跳 `/login?next=<原路径>`
+  - 已登录访问 `/login` `/signup` 自动跳 `/dashboard`
+  - matcher 排除 `_next/static`、`_next/image`、favicon、og-image、robots/sitemap
+- 认证页（`(auth)` 路由组）：
+  - `/login` — 两步式 Email OTP（输邮箱 → 收验证码 → 提交），保留 `?next` 跳回
+  - `/signup` — 同上但 `shouldCreateUser: true`
+  - 两个页都把 `useSearchParams` / 主体表单包进 `<Suspense>`，避免 prerender bailout
+- API routes：
+  - `GET /api/auth/callback` — OAuth / magic-link code exchange（OTP 流程没用，留给未来 Google 登录）
+  - `POST /api/auth/sign-out` — 清 cookie 跳回 `/`
+- `/dashboard` 占位页（Server Component）：
+  - 服务端读 user，没 session redirect `/login`
+  - 显示 `欢迎回来 · {email}`
+  - 退出登录按钮（form POST 到 sign-out 路由）
+- 顺手修了父级 Permit 项目：
+  - `tsconfig.json` exclude 加 `erp`，否则 Permit tsc 会扫到 erp/ 然后 import alias 解错
+  - `eslint.config.mjs` ignore 加 `erp/**`，同理
+- `pnpm build` 通过，输出里能看到 `ƒ Proxy (Middleware)` 一行——proxy.ts 已识别
+
+### 自测路线（你可以走一遍）
+```
+pnpm dev
+→ http://localhost:3000
+→ 点"免费试用" → 输邮箱 → 收件箱里有 6 位码
+→ 输码 → 跳到 /dashboard，能看到 email
+→ 点退出登录 → 回到首页
+```
+
+> Supabase 默认 OTP 邮件模板和 SMTP 在 dev 够用了。生产化要在 Supabase Auth 设置里接 Resend SMTP（之后某天再说）。
+
+### Next
+- Day 4: `/api/orgs` POST + `<CreateOrgDialog>`，首次登录自动给账号 bootstrap 一个组织 + `org_members` 行（role=`org_admin`）
+- Day 5: `requireRole()` helper、`withOrg()` query helper、组织切换器、dashboard sidebar 骨架
+
+---
+
 ## Week 1, Day 2 — 2026-06-04
 
 ### Done
