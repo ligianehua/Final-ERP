@@ -4,6 +4,51 @@
 
 ---
 
+## Week 1, Day 4 — 2026-06-04
+
+### Done — 组织创建 & 首次登录引导
+- `src/lib/validations/org.ts`：`orgCreateSchema` / `orgUpdateSchema` + `slugify(name)` 帮手；slug 走 `^[a-z0-9]+(?:-[a-z0-9]+)*$`，本位币校验三位大写
+- `src/lib/auth/session.ts`：`getCurrentUser()`（`React.cache` 包过，每请求一次）+ `requireUser()` + `UnauthorizedError`
+- `src/lib/orgs/current.ts`：
+  - `getCurrentOrg()` — 读 `quill_active_org` cookie，命中且仍是成员就用它；否则按 `org_members.created_at` 最早那条；都没有返回 `null`（触发 bootstrap UX）
+  - `listMyOrgs()` — 组织切换器后续要用
+  - `isMember(userId, orgId)` — 防 cookie 篡改的守门函数
+  - 每个都 `React.cache` 过
+
+### Done — API routes
+- `GET /api/orgs` — 返回当前用户所有组织 + 角色
+- `POST /api/orgs` — Zod 校验 → 单事务里建 `organizations` 行 + 自动给当前用户挂 `org_admin` membership → 成功后顺手把 `quill_active_org` cookie 设上。捕获 Postgres `23505`（unique violation）→ 409 `slug_taken`
+- `POST /api/orgs/active` — 切换活跃组织前先 `isMember()` 校验；不是成员直接 403
+
+### Done — UI
+- shadcn `dialog` 装好
+- `<CreateOrgDialog>`（client）：
+  - `defaultOpen` 让 bootstrap 卡片直接挂着它
+  - 名称 + 本位币（CNY/USD/PHP 三选一），slug 由后端从 name 自动生成
+  - 成功后 `router.refresh()` —— RSC 重抓数据，dashboard 立刻换面
+- `/dashboard` 改成两态：
+  - 没组织 → BootstrapPanel + 内嵌打开的 dialog
+  - 有组织 → ActiveOrgPanel（组织名 / slug / 本位币 / 你的角色徽章）+ 下一步规划卡
+
+### 自测路线
+```
+登录后落 /dashboard → "创建你的第一个组织" 卡片 + dialog 直接弹
+→ 输组织名（比如「上海菱锦贸易」）→ 选 CNY → 创建
+→ Dialog 关闭，dashboard 切到 ActiveOrgPanel
+→ 上面写组织名、slug、本位币、"你是 · 管理员"
+```
+
+Supabase Table Editor 验证：
+- `organizations` 多一行（slug 是自动 slugified 的）
+- `org_members` 多一行（role = `org_admin`，user_id = 你的 auth user）
+
+### Next
+- Day 5: dashboard 主框架（Topbar + Sidebar）+ 组织切换器 dropdown + `requireRole()` helper
+- Day 6: Vercel 部署 + 子域绑定
+- Day 7: 内部自测，**Week 1 Demo**
+
+---
+
 ## Week 1, Day 3 — 2026-06-04
 
 ### Done
