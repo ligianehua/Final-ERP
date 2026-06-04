@@ -1,0 +1,10 @@
+onlyBuiltDependencies:
+  - sharp
+  - unrs-resolver
+
+# Disable pnpm 11's "minimum release age" gate so we can install fresh releases.
+minimumReleaseAge: 0
+
+allowBuilds:
+  sharp: true
+  unrs-resolver: true
