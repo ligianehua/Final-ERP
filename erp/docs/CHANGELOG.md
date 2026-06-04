@@ -4,6 +4,68 @@
 
 ---
 
+## Week 1, Day 5 — 2026-06-04
+
+### Done — App shell（dashboard 主框架）
+- 路由组 `src/app/(app)/` 顶起整个 ERP 后台：
+  - `(app)/layout.tsx` 一次性拉 `getCurrentUser` + `getCurrentOrg` + `listMyOrgs`，子页面再读全部命中 React.cache
+  - 两态：**无组织** 渲极简 header（只有 "Quill ERP" 字样），完整 bootstrap 体验交给 `/dashboard` 自己处理；**有组织** 渲完整 Topbar + Sidebar + 主内容
+  - `/dashboard` 从 `src/app/dashboard/` 用 `git mv` 搬到 `src/app/(app)/dashboard/`，URL 不变；删掉了它自渲的 outer chrome
+- shadcn `dropdown-menu` / `avatar` / `separator` 三件套就位
+
+### Done — Topbar 组件
+- `components/layout/topbar.tsx`（server）：`[Quill ERP] / [组织切换器]            [用户菜单]`
+  - sticky top，毛玻璃 backdrop-blur
+- `components/layout/org-switcher.tsx`（client）：
+  - DropdownMenu 列出全部 membership，当前打勾，切换中 spinner
+  - 点击切换 → POST `/api/orgs/active` → `router.refresh()`
+  - 底部 "新建组织" 触发受控的 `<CreateOrgDialog>`
+- `components/layout/user-menu.tsx`（client）：
+  - 头像（首两位字母 fallback）
+  - 邮箱 + 角色标签
+  - "退出登录" form POST 到 `/api/auth/sign-out`
+
+### Done — Sidebar 组件 + 导航配置
+- `components/layout/nav-items.ts`：8 个模块的单一信息源（href / label / Lucide 图标 / 可选 role 白名单）
+  - 概览 / 商品 / 仓库 / 往来单位 / 销售 / 采购 / 报表 / 设置
+  - 销售对 `sales`, 采购对 `purchasing`, 设置对 `org_admin` 限可见
+  - `visibleNavItems(role)` helper 给 layout 调用
+- `components/layout/sidebar.tsx`（client）：
+  - `md:flex` 桌面才显示（移动端 Day 8 polish 再做 Sheet drawer）
+  - 当前路径高亮（`pathname === href || pathname.startsWith(href + '/')`）
+
+### Done — RBAC
+- `src/lib/rbac/require-role.ts`：
+  - `requireRole(["org_admin", "sales"])` 单点守门：找用户 → 找活跃组织 → 校验角色在列表内
+  - 三种 typed error：`UnauthorizedError` (401) / `NoActiveOrgError` (409) / `ForbiddenError` (403)
+  - `rbacErrorToResponse(e)` 把 throw 翻译成 HTTP；route handler `try/catch` 后调用一行解决
+  - 空 `allowed` 数组 = "登录且有活跃组织即可"
+- 注：这一刀目前 *尚未* 接到现有 `/api/orgs*` 路由——orgs 的语义本身就是"任何登录用户都能建/列"，不归 requireRole 管。从 Day 6 / Week 2 主数据起，所有 org-scoped API 走 requireRole
+
+### Done — CreateOrgDialog 重构
+- 之前只能 uncontrolled，挡住了 org-switcher 里"+新建组织"的复用
+- 现支持三种模式：`defaultOpen`（bootstrap）、controlled `open/onOpenChange`（org switcher）、默认按钮 trigger（独立挂载）
+
+### 自测路线
+```
+1. 已登录用户进 /dashboard：
+   → 顶部出现完整 topbar："Quill ERP / [组织名 ⇅] ............ [头像]"
+   → 桌面分辨率下左侧出现 sidebar，"概览"高亮
+   → 点头像 → 邮箱 / 角色 / 退出登录都在
+2. 点组织名 dropdown：
+   → 当前组织打勾 → 点 "新建组织" → dialog 弹出
+   → 填名字 → 创建 → router.refresh() → dropdown 里多一条 → 自动切到新组织
+3. 切换组织：点 dropdown 选另一条 → spinner → 全页 refresh，topbar 名字变
+4. 缩窄窗口到 < md：sidebar 隐藏（移动端导航 Day 8 再做）
+```
+
+### Next
+- Day 6: Vercel 部署 + 子域绑定（如果你已经买了 erp.xxx 域名告诉我）
+- Day 7: 内部自测，**Week 1 Demo**（录 60 秒：进 / 注册 / 创建组织 / 进 dashboard / 退出）
+- Week 2: items / warehouses / parties 主数据 CRUD（侧栏里那 8 个链接开始有内容）
+
+---
+
 ## Week 1, Day 4 — 2026-06-04
 
 ### Done — 组织创建 & 首次登录引导

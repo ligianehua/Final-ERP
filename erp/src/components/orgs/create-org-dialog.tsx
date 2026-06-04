@@ -19,8 +19,11 @@ import {
 } from "@/components/ui/dialog";
 
 type Props = {
-  /** When true the dialog renders pre-opened — used by the bootstrap UI. */
+  /** Uncontrolled initial state. Ignored when `open` is provided. */
   defaultOpen?: boolean;
+  /** Controlled open state (paired with `onOpenChange`). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   /** Optional custom trigger; falls back to a primary button. */
   trigger?: React.ReactNode;
 };
@@ -35,9 +38,20 @@ const CURRENCIES = ["CNY", "USD", "PHP"] as const;
  * On success the cookie is set server-side and we router.refresh() so
  * the active-org-dependent panels re-render.
  */
-export function CreateOrgDialog({ defaultOpen = false, trigger }: Props) {
+export function CreateOrgDialog({
+  defaultOpen = false,
+  open: controlledOpen,
+  onOpenChange,
+  trigger,
+}: Props) {
   const router = useRouter();
-  const [open, setOpen] = useState(defaultOpen);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : uncontrolledOpen;
+  const setOpen = (next: boolean) => {
+    if (!isControlled) setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  };
   const [name, setName] = useState("");
   const [baseCurrency, setBaseCurrency] =
     useState<(typeof CURRENCIES)[number]>("CNY");
@@ -74,7 +88,7 @@ export function CreateOrgDialog({ defaultOpen = false, trigger }: Props) {
     <Dialog open={open} onOpenChange={setOpen}>
       {trigger ? (
         <DialogTrigger asChild>{trigger}</DialogTrigger>
-      ) : !defaultOpen ? (
+      ) : !defaultOpen && !isControlled ? (
         <DialogTrigger asChild>
           <Button>新建组织</Button>
         </DialogTrigger>
