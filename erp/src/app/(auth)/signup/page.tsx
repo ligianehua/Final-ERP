@@ -35,8 +35,14 @@ export default function SignupPage() {
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      // Signup mode: create the auth user on first OTP request.
-      options: { shouldCreateUser: true },
+      options: {
+        // Signup mode: create the auth user on first OTP request.
+        shouldCreateUser: true,
+        // Where the magic link in the email lands. Default Supabase
+        // email template sends a link, not a code — so this is the
+        // real happy path until we ship custom SMTP.
+        emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/dashboard`,
+      },
     });
 
     if (error) setError(error.message);
@@ -82,7 +88,7 @@ export default function SignupPage() {
             <CardDescription>
               {step === "email"
                 ? "输入邮箱开始。30 秒之内可用。"
-                : `验证码已发到 ${email}`}
+                : `已发到 ${email}，可以直接点邮件里的链接，或在下方输入验证码。`}
             </CardDescription>
           </CardHeader>
 

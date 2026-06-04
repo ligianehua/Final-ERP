@@ -50,8 +50,14 @@ function LoginForm() {
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      // Login mode: don't accidentally create an account for typos.
-      options: { shouldCreateUser: false },
+      options: {
+        // Login mode: don't accidentally create an account for typos.
+        shouldCreateUser: false,
+        // Where the magic link in the email lands. Until we ship custom
+        // SMTP (Week 8) the default email template sends a link not a
+        // code, so this is the actual happy path.
+        emailRedirectTo: `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(nextPath)}`,
+      },
     });
 
     if (error) setError(error.message);
@@ -96,8 +102,8 @@ function LoginForm() {
             <CardTitle>登录</CardTitle>
             <CardDescription>
               {step === "email"
-                ? "输入邮箱，给你发一次性验证码。"
-                : `验证码已发到 ${email}`}
+                ? "输入邮箱，给你发一次性登录邮件。"
+                : `已发到 ${email}，可以直接点邮件里的链接登录，或在下方输入验证码。`}
             </CardDescription>
           </CardHeader>
 
