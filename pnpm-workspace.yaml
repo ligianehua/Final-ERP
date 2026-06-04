@@ -1,0 +1,8 @@
+onlyBuiltDependencies:
+  - sharp
+  - unrs-resolver
+
+# Disable the "minimum release age" supply-chain gate at the workspace level.
+# pnpm 11 rejects just-published packages by default; this allows us to
+# install the latest openai/etc. without waiting.
+minimumReleaseAge: 0
