@@ -1,0 +1,6 @@
+interface:
+  display_name: "Final ERP"
+  short_description: "Repo-specific patterns and workflows for Final-ERP"
+  default_prompt: "Use the Final-ERP repo skill to follow existing architecture, testing, and workflow conventions."
+policy:
+  allow_implicit_invocation: true
